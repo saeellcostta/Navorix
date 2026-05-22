@@ -1,0 +1,47 @@
+"use client";
+
+import React from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
+import { Input } from "@/components/ui/Input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/Tabs";
+import { cn } from "@/lib/utils";
+
+type SortOption = "trending" | "new" | "marketcap" | "volume";
+
+interface TokensFilterProps {
+  sort: SortOption;
+  onSortChange: (v: SortOption) => void;
+  search: string;
+  onSearchChange: (v: string) => void;
+}
+
+export function TokensFilter({
+  sort,
+  onSortChange,
+  search,
+  onSearchChange,
+}: TokensFilterProps) {
+  return (
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      {/* Search */}
+      <div className="flex-1 min-w-0">
+        <Input
+          placeholder="Search by name, symbol or mint address..."
+          leftAdornment={<Search className="h-4 w-4" />}
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+      </div>
+
+      {/* Sort tabs */}
+      <Tabs defaultValue={sort} value={sort} onValueChange={(v) => onSortChange(v as SortOption)}>
+        <TabsList className="shrink-0 w-full sm:w-auto">
+          <TabsTrigger value="trending">🔥 Hot</TabsTrigger>
+          <TabsTrigger value="new">✨ New</TabsTrigger>
+          <TabsTrigger value="marketcap">💰 Cap</TabsTrigger>
+          <TabsTrigger value="volume">📊 Vol</TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
+  );
+}
