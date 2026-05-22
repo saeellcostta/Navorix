@@ -43,6 +43,22 @@ export interface TokenCreateInput {
   image: File | null;
   decimals: number;
   initialSupply: number;
+  /** Optional initial buy in SOL at launch rate (0 = skip) */
+  initialBuySol: number;
+}
+
+/**
+ * Summary shown to the user before they sign the creation transaction.
+ */
+export interface TokenLaunchSummary {
+  /** Fixed platform fee */
+  creationFeeSol: number;
+  /** Optional pre-buy SOL amount chosen by the creator */
+  initialBuySol: number;
+  /** Tokens the creator receives from the pre-buy */
+  tokensReceived: number;
+  /** Total SOL the wallet must have (creationFee + initialBuy + gas buffer) */
+  totalCostSol: number;
 }
 
 export interface TokenListItem extends Token {
