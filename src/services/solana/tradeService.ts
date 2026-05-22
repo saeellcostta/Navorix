@@ -6,6 +6,11 @@
  *  - Each token has its own SOL/TOKEN pool on-chain
  *  - Trades are signed by the connected wallet
  *
+ * Fee routing:
+ *  - 1% of every trade is transferred to the Navorix fee wallet:
+ *    FvmN4BnLKR25QWXXoLof2RZFzwC8XU3QLcPr1aJg1UvQ
+ *  - Fee is deducted from amountIn before the AMM swap calculation
+ *
  * Integration points:
  *  - Replace pool state fetch with your on-chain program account read
  *  - Replace instruction building with your program's buy/sell instruction

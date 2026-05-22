@@ -28,6 +28,10 @@ export const MAX_SLIPPAGE_PCT = 0.5;
 export const TOKEN_METADATA_PROGRAM_ID =
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
 
-/** Navorix fee wallet — replace with real address before mainnet */
+/**
+ * Navorix fee collector wallet.
+ * All token creation fees (0.02 SOL) and trade fees (1%) flow here.
+ * Can be overridden via NEXT_PUBLIC_FEE_WALLET env variable.
+ */
 export const FEE_WALLET_ADDRESS =
-  process.env.NEXT_PUBLIC_FEE_WALLET ?? "11111111111111111111111111111111";
+  process.env.NEXT_PUBLIC_FEE_WALLET ?? "FvmN4BnLKR25QWXXoLof2RZFzwC8XU3QLcPr1aJg1UvQ";

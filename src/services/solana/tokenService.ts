@@ -39,7 +39,7 @@ export interface CreateTokenResult {
  *
  * Steps performed:
  *  1. Verify wallet is connected and has enough SOL
- *  2. Transfer platform fee to fee wallet
+ *  2. Transfer platform fee (0.02 SOL) → FvmN4BnLKR25QWXXoLof2RZFzwC8XU3QLcPr1aJg1UvQ
  *  3. createMint()
  *  4. getOrCreateAssociatedTokenAccount()
  *  5. mintTo() with initialSupply
