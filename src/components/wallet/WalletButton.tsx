@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
-import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink, Smartphone } from "lucide-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useNavorixWallet } from "@/contexts/WalletContext";
 import { useSolBalance } from "@/hooks/useSolBalance";
+import {
+  isPhantomMobileRequired,
+  isInsidePhantomBrowser,
+  openPhantomConnect,
+  parsePhantomCallbackParams,
+} from "@/lib/phantomMobile";
 import { cn } from "@/lib/utils";
 
 export function WalletButton() {
@@ -12,10 +18,31 @@ export function WalletButton() {
     useNavorixWallet();
   const { setVisible } = useWalletModal();
   const { balance } = useSolBalance();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]   = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  const handleConnect = () => setVisible(true);
+  // Detect mobile on mount
+  useEffect(() => {
+    setIsMobile(isPhantomMobileRequired());
+
+    // Handle Phantom callback after mobile connection
+    if (isInsidePhantomBrowser()) return; // Already inside Phantom — use adapter
+    const { errorCode, errorMessage } = parsePhantomCallbackParams();
+    if (errorCode) {
+      console.warn("Phantom mobile error:", errorCode, errorMessage);
+    }
+  }, []);
+
+  const handleConnect = () => {
+    if (isMobile && !isInsidePhantomBrowser()) {
+      // Mobile: redirect to Phantom app via deep link
+      openPhantomConnect();
+    } else {
+      // Desktop / Phantom browser: use wallet modal
+      setVisible(true);
+    }
+  };
 
   const copyAddress = async () => {
     if (!publicKeyStr) return;
@@ -34,12 +61,19 @@ export function WalletButton() {
           "border border-[var(--border-strong)] text-[var(--gold)] text-sm font-semibold",
           "bg-[var(--gold-dim)] hover:bg-[rgba(251,191,36,0.2)]",
           "transition-all duration-200 hover:shadow-[var(--gold-glow)]",
-          "disabled:opacity-60 disabled:cursor-not-allowed",
-          "cursor-pointer"
+          "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
         )}
       >
-        <Wallet className="h-4 w-4" />
-        {connecting ? "Connecting..." : "Connect Wallet"}
+        {isMobile ? (
+          <Smartphone className="h-4 w-4" />
+        ) : (
+          <Wallet className="h-4 w-4" />
+        )}
+        {connecting
+          ? "Conectando..."
+          : isMobile
+            ? "Abrir Phantom"
+            : "Conectar Carteira"}
       </button>
     );
   }
@@ -52,8 +86,7 @@ export function WalletButton() {
           "inline-flex items-center gap-2 rounded-lg px-3 py-2",
           "border border-[var(--border-strong)] text-[var(--text-primary)] text-sm font-semibold",
           "bg-[var(--surface-2)] hover:bg-[var(--surface-3)]",
-          "transition-all duration-200",
-          "cursor-pointer"
+          "transition-all duration-200 cursor-pointer"
         )}
       >
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#fbbf24] to-[#d97706]">
@@ -75,7 +108,6 @@ export function WalletButton() {
         />
       </button>
 
-      {/* Dropdown */}
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
@@ -83,13 +115,11 @@ export function WalletButton() {
             className={cn(
               "absolute right-0 top-full mt-2 z-40 w-56",
               "rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)]",
-              "shadow-2xl shadow-black/60",
-              "py-1"
+              "shadow-2xl shadow-black/60 py-1"
             )}
           >
-            {/* Wallet info */}
             <div className="px-4 py-3 border-b border-[var(--border)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Connected wallet</p>
+              <p className="text-xs text-[var(--text-muted)] mb-1">Carteira conectada</p>
               <p className="text-sm font-mono text-[var(--gold)] break-all">{shortAddress}</p>
               {balance !== null && (
                 <p className="text-sm font-bold text-[var(--text-primary)] mt-1">
@@ -98,7 +128,6 @@ export function WalletButton() {
               )}
             </div>
 
-            {/* Actions */}
             <button
               onClick={copyAddress}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)] transition-colors"
@@ -108,7 +137,7 @@ export function WalletButton() {
               ) : (
                 <Copy className="h-4 w-4" />
               )}
-              {copied ? "Copied!" : "Copy address"}
+              {copied ? "Copiado!" : "Copiar endereço"}
             </button>
 
             <a
@@ -119,20 +148,17 @@ export function WalletButton() {
               onClick={() => setOpen(false)}
             >
               <ExternalLink className="h-4 w-4" />
-              View on Solscan
+              Ver no Solscan
             </a>
 
             <div className="my-1 border-t border-[var(--border)]" />
 
             <button
-              onClick={() => {
-                disconnectWallet();
-                setOpen(false);
-              }}
+              onClick={() => { disconnectWallet(); setOpen(false); }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#ef4444] hover:bg-[rgba(239,68,68,0.08)] transition-colors"
             >
               <LogOut className="h-4 w-4" />
-              Disconnect
+              Desconectar
             </button>
           </div>
         </>

@@ -79,6 +79,23 @@ export async function getTokens(opts: {
     volume:    "token_stats.volume_24h_usd",
   };
 
+  // Use the tokens_trending view for trending sort (real 24h volume score)
+  if (sort === "trending") {
+    const { data, error } = await db
+      .from("tokens_trending")
+      .select("*")
+      .range(offset, offset + limit - 1);
+
+    if (error) throw new Error(`getTokens(trending): ${error.message}`);
+
+    return (data ?? []).map((row: Record<string, unknown>, i: number) =>
+      rowToTokenListItem(
+        row as unknown as TokenRow & { token_stats: TokenStatsRow | null },
+        offset + i + 1
+      )
+    );
+  }
+
   let query = db
     .from("tokens")
     .select("*, token_stats(*)")
@@ -87,8 +104,6 @@ export async function getTokens(opts: {
   if (sort === "new") {
     query = query.order("created_at", { ascending: false });
   } else {
-    // For stats-based sorts, fall back to created_at so it never errors
-    // when stats table is empty — replace with proper join sort as data grows
     query = query.order("created_at", { ascending: false });
   }
 
