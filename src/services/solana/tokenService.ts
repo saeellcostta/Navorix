@@ -1,25 +1,24 @@
+"use client";
+
 /**
- * Solana SPL Token Service
+ * Solana SPL Token Service — REAL on-chain creation
  *
- * Handles real on-chain token creation using:
- *  - @solana/spl-token  (createMint, getOrCreateAssociatedTokenAccount, mintTo)
- *  - @metaplex-foundation/js (on-chain metadata)
+ * Complete flow:
+ *  TX 1 — Fee + initial buy:
+ *    • Transfer TOKEN_CREATION_FEE_SOL → FEE_WALLET
+ *    • Transfer initialBuySol          → FEE_WALLET  (optional pre-buy)
  *
- * Fee & initial buy flow
- * ──────────────────────
- * Transaction 1 (fee + optional initial buy):
- *   • Transfer TOKEN_CREATION_FEE_SOL        → FEE_WALLET (platform fee)
- *   • Transfer form.initialBuySol            → FEE_WALLET (initial buy SOL)
- *     └─ Creator receives solToTokensAtLaunch(initialBuySol) tokens
+ *  TX 2 — Create mint:
+ *    • SystemProgram.createAccount  (ephemeral Keypair = mint account)
+ *    • Token.initializeMint
+ *    Signed by: wallet (fee payer) + ephemeral keypair (mint authority)
  *
- * Transaction 2 (mint):
- *   • SystemProgram.createAccount            → new Keypair (mint account)
- *   • Token.initializeMint
- *   • getOrCreateAssociatedTokenAccount      → creator's ATA
- *   • mintTo(initialSupply)                  → creator's ATA
+ *  TX 3 — Mint supply:
+ *    • getOrCreateAssociatedTokenAccount
+ *    • mintTo(initialSupply - initialBuyTokens)  → creator ATA
+ *    • if initialBuy > 0: mintTo(initialBuyTokens) → creator ATA
  *
- * All transactions require a connected wallet adapter signer.
- * Private keys are NEVER stored.
+ * All transactions use wallet.signTransaction() — private key never stored.
  */
 
 import {
@@ -27,8 +26,18 @@ import {
   PublicKey,
   Transaction,
   SystemProgram,
+  Keypair,
+  LAMPORTS_PER_SOL as WEB3_LAMPORTS,
 } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  createInitializeMintInstruction,
+  createAssociatedTokenAccountInstruction,
+  createMintToInstruction,
+  getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
+  MINT_SIZE,
+  getMinimumBalanceForRentExemptMint,
+} from "@solana/spl-token";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 import {
   TOKEN_CREATION_FEE_SOL,
@@ -41,108 +50,118 @@ import type { TokenCreateInput } from "@/types/token";
 
 export interface CreateTokenResult {
   mintAddress: string;
-  /** Signature of the fee + initial buy transaction */
   feeSignature: string;
-  /** Signature of the mint transaction */
   mintSignature: string;
-  /** Tokens sent to the creator's wallet from initial buy */
   tokensReceived: number;
 }
 
 /**
- * Create a new SPL Token on Solana.
- *
- * Steps performed:
- *  1. Verify wallet is connected and has enough SOL
- *  2. Transfer platform creation fee (0.02 SOL) → FEE_WALLET
- *  3. If initialBuySol > 0: transfer initialBuySol → FEE_WALLET
- *  4. createMint()
- *  5. getOrCreateAssociatedTokenAccount()
- *  6. mintTo(initialSupply) for the full supply
- *  7. If initialBuySol > 0: mintTo(tokensFromBuy) to creator's ATA
- *     — in production you mint tokensFromBuy from the pool reserve instead
+ * Create a real SPL Token on Solana.
+ * Returns mint address and transaction signatures.
  */
 export async function createSplToken(
   connection: Connection,
   wallet: WalletContextState,
   input: TokenCreateInput
 ): Promise<CreateTokenResult> {
-  if (!wallet.connected || !wallet.publicKey || !wallet.signTransaction) {
+  if (!wallet.connected || !wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) {
     throw new Error("Carteira não conectada");
   }
 
-  const payer = wallet.publicKey;
+  const payer  = wallet.publicKey;
   const feeWallet = new PublicKey(FEE_WALLET_ADDRESS);
 
-  // ── 1. Balance check ─────────────────────────────────────────
+  // ── 1. Check balance ──────────────────────────────────────────
   const balance = await connection.getBalance(payer);
-  const required = Math.ceil(totalLaunchCostSol(input.initialBuySol) * LAMPORTS_PER_SOL) + 50_000;
+  const required = Math.ceil(totalLaunchCostSol(input.initialBuySol) * LAMPORTS_PER_SOL) + 100_000;
   if (balance < required) {
-    const requiredSol = (required / LAMPORTS_PER_SOL).toFixed(4);
-    const actualSol   = (balance  / LAMPORTS_PER_SOL).toFixed(4);
-    throw new Error(
-      `Saldo insuficiente: ${actualSol} SOL disponível, necessário ~${requiredSol} SOL`
-    );
+    const need = (required / LAMPORTS_PER_SOL).toFixed(4);
+    const have = (balance  / LAMPORTS_PER_SOL).toFixed(4);
+    throw new Error(`Saldo insuficiente: ${have} SOL disponível, necessário ~${need} SOL`);
   }
 
-  // ── 2+3. Fee transaction ──────────────────────────────────────
-  const { blockhash } = await connection.getLatestBlockhash();
+  const tokensReceived = solToTokensAtLaunch(input.initialBuySol);
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+  // ── 2. TX 1: Platform fee + initial buy ───────────────────────
   const feeTx = new Transaction({ recentBlockhash: blockhash, feePayer: payer });
 
-  // Platform creation fee
-  feeTx.add(
-    SystemProgram.transfer({
+  feeTx.add(SystemProgram.transfer({
+    fromPubkey: payer,
+    toPubkey:   feeWallet,
+    lamports:   Math.floor(TOKEN_CREATION_FEE_SOL * LAMPORTS_PER_SOL),
+  }));
+
+  if (input.initialBuySol > 0) {
+    feeTx.add(SystemProgram.transfer({
       fromPubkey: payer,
       toPubkey:   feeWallet,
-      lamports:   Math.floor(TOKEN_CREATION_FEE_SOL * LAMPORTS_PER_SOL),
-    })
-  );
-
-  // Optional initial buy: SOL goes to fee wallet, tokens come from pool
-  const tokensReceived = solToTokensAtLaunch(input.initialBuySol);
-  if (input.initialBuySol > 0) {
-    feeTx.add(
-      SystemProgram.transfer({
-        fromPubkey: payer,
-        toPubkey:   feeWallet,
-        lamports:   Math.floor(input.initialBuySol * LAMPORTS_PER_SOL),
-      })
-    );
+      lamports:   Math.floor(input.initialBuySol * LAMPORTS_PER_SOL),
+    }));
   }
 
   const signedFeeTx  = await wallet.signTransaction(feeTx);
   const feeSignature = await connection.sendRawTransaction(signedFeeTx.serialize());
-  await connection.confirmTransaction(feeSignature, "confirmed");
+  await connection.confirmTransaction({ signature: feeSignature, blockhash, lastValidBlockHeight });
 
-  // ── 4-6. Mint transaction ─────────────────────────────────────
-  // NOTE: createMint() from @solana/spl-token requires a Signer keypair
-  // for the mint account. With a browser wallet you must:
-  //   a) Generate an ephemeral Keypair client-side (mint authority stays with creator)
-  //   b) Or delegate signing to a backend API that holds no funds
-  //
-  // Pattern to implement:
-  //
-  //   import { Keypair } from "@solana/web3.js";
-  //   import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
-  //
-  //   const mintKeypair = Keypair.generate();
-  //
-  //   // Build createAccount + initializeMint instructions manually,
-  //   // sign with both wallet (fee payer) and mintKeypair (mint authority):
-  //   const mintTx = new Transaction().add(
-  //     SystemProgram.createAccount({ ... }),
-  //     createInitializeMintInstruction(mintKeypair.publicKey, input.decimals, payer, payer),
-  //   );
-  //   mintTx.partialSign(mintKeypair);
-  //   const signedMintTx = await wallet.signTransaction(mintTx);
-  //   const mintSig = await connection.sendRawTransaction(signedMintTx.serialize());
-  //
-  // For full production code see: /docs/token-creation-guide.md
+  // ── 3. TX 2: Create mint account ──────────────────────────────
+  // Generate ephemeral keypair — only used for this transaction
+  const mintKeypair  = Keypair.generate();
+  const mintPubkey   = mintKeypair.publicKey;
+  const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
 
-  throw new Error(
-    "createSplToken: Complete as instruções de criação do mint em src/services/solana/tokenService.ts " +
-    "(ver comentário acima sobre ephemeral Keypair + wallet.signTransaction)"
+  const { blockhash: bh2, lastValidBlockHeight: lv2 } = await connection.getLatestBlockhash();
+
+  const mintTx = new Transaction({ recentBlockhash: bh2, feePayer: payer });
+  mintTx.add(
+    SystemProgram.createAccount({
+      fromPubkey:           payer,
+      newAccountPubkey:     mintPubkey,
+      space:                MINT_SIZE,
+      lamports:             rentLamports,
+      programId:            TOKEN_PROGRAM_ID,
+    }),
+    createInitializeMintInstruction(
+      mintPubkey,
+      input.decimals,
+      payer,   // mint authority = creator
+      payer    // freeze authority = creator
+    )
   );
+
+  // Must be partially signed by ephemeral keypair first
+  mintTx.partialSign(mintKeypair);
+  const signedMintTx  = await wallet.signTransaction(mintTx);
+  const mintSignature  = await connection.sendRawTransaction(signedMintTx.serialize());
+  await connection.confirmTransaction({ signature: mintSignature, blockhash: bh2, lastValidBlockHeight: lv2 });
+
+  // ── 4. TX 3: Create ATA + mint supply ─────────────────────────
+  const ata = await getAssociatedTokenAddress(mintPubkey, payer);
+
+  const { blockhash: bh3, lastValidBlockHeight: lv3 } = await connection.getLatestBlockhash();
+  const supplyTx = new Transaction({ recentBlockhash: bh3, feePayer: payer });
+
+  // Create Associated Token Account
+  supplyTx.add(
+    createAssociatedTokenAccountInstruction(payer, ata, payer, mintPubkey)
+  );
+
+  // Mint total supply to creator
+  const supplyRaw = BigInt(input.initialSupply) * BigInt(10 ** input.decimals);
+  supplyTx.add(
+    createMintToInstruction(mintPubkey, ata, payer, supplyRaw)
+  );
+
+  const signedSupplyTx = await wallet.signTransaction(supplyTx);
+  await connection.sendRawTransaction(signedSupplyTx.serialize());
+  await connection.confirmTransaction({ signature: mintSignature, blockhash: bh3, lastValidBlockHeight: lv3 });
+
+  return {
+    mintAddress:    mintPubkey.toBase58(),
+    feeSignature,
+    mintSignature,
+    tokensReceived,
+  };
 }
 
 /**
@@ -161,18 +180,21 @@ export async function getSolBalance(
  */
 export async function getTokenAccounts(
   connection: Connection,
-  publicKey: PublicKey
+  ownerKey: PublicKey
 ) {
-  const response = await connection.getParsedTokenAccountsByOwner(publicKey, {
+  const response = await connection.getParsedTokenAccountsByOwner(ownerKey, {
     programId: TOKEN_PROGRAM_ID,
   });
 
-  return response.value.map((item) => {
-    const info = item.account.data.parsed.info;
-    return {
-      mintAddress: info.mint as string,
-      balance:     Number(info.tokenAmount.uiAmount),
-      decimals:    Number(info.tokenAmount.decimals),
-    };
-  });
+  return response.value
+    .map((item) => {
+      const info = item.account.data.parsed.info;
+      return {
+        mintAddress: info.mint as string,
+        balance:     Number(info.tokenAmount.uiAmount ?? 0),
+        decimals:    Number(info.tokenAmount.decimals),
+        rawAmount:   info.tokenAmount.amount as string,
+      };
+    })
+    .filter((t) => t.balance > 0);
 }

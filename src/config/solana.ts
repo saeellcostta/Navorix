@@ -4,8 +4,9 @@ import type { WalletNetwork } from "@/types/wallet";
 export const SOLANA_NETWORK: WalletNetwork =
   (process.env.NEXT_PUBLIC_SOLANA_NETWORK as WalletNetwork) ?? "devnet";
 
+// Use || (not ??) so empty strings also fall back to the public RPC
 export const SOLANA_RPC_ENDPOINT =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? clusterApiUrl(SOLANA_NETWORK);
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl(SOLANA_NETWORK);
 
 export const SOLANA_COMMITMENT = "confirmed" as const;
 
