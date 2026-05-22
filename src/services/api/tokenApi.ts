@@ -1,9 +1,6 @@
 /**
- * Token REST API client
- *
- * These functions call the Next.js API routes (/api/...) which in turn
- * read from Supabase / index on-chain data. Swap out the fetch calls
- * if you add a dedicated backend (Railway / Render).
+ * Token REST API client (browser-side).
+ * Calls the Next.js API routes in /api/...
  */
 
 import type { Token, TokenListItem } from "@/types/token";
@@ -17,10 +14,12 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API error ${res.status}: ${body}`);
+    throw new Error(`API ${res.status}: ${body}`);
   }
   return res.json() as Promise<T>;
 }
+
+// ── READ ───────────────────────────────────────────────
 
 export async function fetchTokens(params?: {
   sort?: "trending" | "new" | "marketcap" | "volume";
@@ -29,10 +28,7 @@ export async function fetchTokens(params?: {
 }): Promise<TokenListItem[]> {
   const qs = new URLSearchParams(
     Object.entries(params ?? {}).reduce<Record<string, string>>(
-      (acc, [k, v]) => {
-        if (v !== undefined) acc[k] = String(v);
-        return acc;
-      },
+      (acc, [k, v]) => { if (v !== undefined) acc[k] = String(v); return acc; },
       {}
     )
   ).toString();
@@ -49,4 +45,57 @@ export async function fetchTrendingTokens(limit = 20): Promise<TokenListItem[]> 
 
 export async function fetchNewTokens(limit = 20): Promise<TokenListItem[]> {
   return fetchTokens({ sort: "new", limit });
+}
+
+// ── WRITE ──────────────────────────────────────────────
+
+/**
+ * Register a newly created token in the database.
+ * Call this AFTER on-chain transaction is confirmed.
+ */
+export async function registerToken(input: {
+  mintAddress:   string;
+  name:          string;
+  symbol:        string;
+  description?:  string;
+  imageUrl?:     string;
+  decimals:      number;
+  initialSupply: number;
+  creatorWallet: string;
+  creationTx:    string;
+  initialBuySol: number;
+}): Promise<Token> {
+  return apiFetch<Token>("/tokens", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Record a confirmed on-chain trade.
+ */
+export async function recordTrade(input: {
+  mintAddress:   string;
+  traderWallet:  string;
+  direction:     "buy" | "sell";
+  amountIn:      number;
+  amountOut:     number;
+  feeSol:        number;
+  priceSol:      number;
+  txSignature:   string;
+}): Promise<void> {
+  await apiFetch<void>("/trades", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Upsert user record when wallet connects.
+ */
+export async function upsertUserOnConnect(walletAddress: string): Promise<void> {
+  await apiFetch<void>("/user", {
+    method: "POST",
+    body: JSON.stringify({ walletAddress }),
+  });
 }

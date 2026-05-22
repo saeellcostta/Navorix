@@ -20,6 +20,8 @@
     "@solana/wallet-adapter-solflare": "^0.6.33",
     "@solana/wallet-adapter-wallets": "^0.19.38",
     "@solana/web3.js": "^1.98.4",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",

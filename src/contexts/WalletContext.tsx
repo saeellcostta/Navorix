@@ -8,7 +8,7 @@
  *         by @solana/wallet-adapter-phantom on mobile browsers.
  */
 
-import React, { createContext, useContext, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useMemo, useCallback, useEffect, useRef } from "react";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import {
   ConnectionProvider,
@@ -36,6 +36,7 @@ const NavorixWalletContext = createContext<NavorixWalletContextValue | null>(nul
 
 function NavorixWalletContextBridge({ children }: { children: React.ReactNode }) {
   const { publicKey, connected, connecting, disconnect } = useWallet();
+  const upsertedRef = useRef<string | null>(null);
 
   const publicKeyStr = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
   const shortAddress = useMemo(() => {
@@ -43,7 +44,23 @@ function NavorixWalletContextBridge({ children }: { children: React.ReactNode })
     return `${publicKeyStr.slice(0, 4)}...${publicKeyStr.slice(-4)}`;
   }, [publicKeyStr]);
 
+  // Upsert user record in DB whenever a new wallet connects
+  useEffect(() => {
+    if (!connected || !publicKeyStr) return;
+    if (upsertedRef.current === publicKeyStr) return;
+    upsertedRef.current = publicKeyStr;
+
+    fetch("/api/user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress: publicKeyStr }),
+    }).catch(() => {
+      // Non-critical — silently fail if DB is not yet configured
+    });
+  }, [connected, publicKeyStr]);
+
   const disconnectWallet = useCallback(async () => {
+    upsertedRef.current = null;
     await disconnect();
   }, [disconnect]);
 
