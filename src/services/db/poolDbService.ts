@@ -16,6 +16,7 @@ function rowToPool(
   const token = row.tokens ?? null;
   return {
     id:              row.id,
+    raydiumPoolId:   row.raydium_pool_id ?? null,
     tokenMint:       row.mint_address,
     tokenSymbol:     token?.symbol ?? "",
     tokenName:       token?.name ?? "",
@@ -72,19 +73,21 @@ export async function getPoolByMint(mintAddress: string): Promise<LiquidityPool 
  * Create or update a pool after a token is launched.
  */
 export async function upsertPool(input: {
-  mintAddress: string;
-  solReserve: number;
-  tokenReserve: number;
-  feePct?: number;
+  mintAddress:    string;
+  solReserve:     number;
+  tokenReserve:   number;
+  feePct?:        number;
+  raydiumPoolId?: string | null;
 }): Promise<void> {
   const db = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db.from("pools") as any).upsert(
     {
-      mint_address:  input.mintAddress,
-      sol_reserve:   input.solReserve,
-      token_reserve: input.tokenReserve,
-      fee_pct:       input.feePct ?? 0.01,
+      mint_address:     input.mintAddress,
+      raydium_pool_id:  input.raydiumPoolId ?? null,
+      sol_reserve:      input.solReserve,
+      token_reserve:    input.tokenReserve,
+      fee_pct:          input.feePct ?? 0.01,
     },
     { onConflict: "mint_address" }
   );

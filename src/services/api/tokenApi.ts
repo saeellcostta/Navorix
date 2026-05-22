@@ -54,16 +54,17 @@ export async function fetchNewTokens(limit = 20): Promise<TokenListItem[]> {
  * Call this AFTER on-chain transaction is confirmed.
  */
 export async function registerToken(input: {
-  mintAddress:   string;
-  name:          string;
-  symbol:        string;
-  description?:  string;
-  imageUrl?:     string;
-  decimals:      number;
-  initialSupply: number;
-  creatorWallet: string;
-  creationTx:    string;
-  initialBuySol: number;
+  mintAddress:    string;
+  name:           string;
+  symbol:         string;
+  description?:   string;
+  imageUrl?:      string;
+  decimals:       number;
+  initialSupply:  number;
+  creatorWallet:  string;
+  creationTx:     string;
+  initialBuySol:  number;
+  raydiumPoolId?: string;
 }): Promise<Token> {
   return apiFetch<Token>("/tokens", {
     method: "POST",

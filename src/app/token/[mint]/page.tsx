@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { PriceChange } from "@/components/ui/PriceChange";
 import { getTokenByMint } from "@/services/db/tokenDbService";
+import { getPoolByMint } from "@/services/db/poolDbService";
 import { isValidPublicKey } from "@/utils/validation";
 import { formatUsd, formatCompact, shortenAddress, timeAgo } from "@/utils/format";
 
@@ -37,7 +38,10 @@ export default async function TokenDetailPage({ params }: PageProps) {
 
   if (!isValidPublicKey(mint)) notFound();
 
-  const token = await getTokenByMint(mint).catch(() => null);
+  const [token, pool] = await Promise.all([
+    getTokenByMint(mint).catch(() => null),
+    getPoolByMint(mint).catch(() => null),
+  ]);
   if (!token) notFound();
 
   const stats = token.stats;
@@ -160,7 +164,11 @@ export default async function TokenDetailPage({ params }: PageProps) {
 
         {/* ── Right column (1/3) ── */}
         <div className="space-y-4">
-          <TradePanel mintAddress={mint} tokenSymbol={token.symbol} pool={null} />
+          <TradePanel
+            mintAddress={mint}
+            tokenSymbol={token.symbol}
+            poolId={pool?.id ?? null}
+          />
 
           {/* Links externos */}
           <Card>

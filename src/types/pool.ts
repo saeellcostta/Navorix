@@ -1,5 +1,7 @@
 export interface LiquidityPool {
   id: string;
+  /** Raydium CPMM pool ID — null until pool is created */
+  raydiumPoolId: string | null;
   tokenMint: string;
   tokenSymbol: string;
   tokenName: string;

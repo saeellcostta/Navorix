@@ -113,6 +113,7 @@ export interface Database {
         Row: {
           id: string;
           mint_address: string;
+          raydium_pool_id: string | null;
           sol_reserve: number;
           token_reserve: number;
           total_liquidity_usd: number;
@@ -127,6 +128,7 @@ export interface Database {
         Insert: {
           id?: string;
           mint_address: string;
+          raydium_pool_id?: string | null;
           sol_reserve?: number;
           token_reserve?: number;
           total_liquidity_usd?: number;

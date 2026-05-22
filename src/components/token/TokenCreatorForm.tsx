@@ -31,7 +31,8 @@ const STEPS = [
   { key: "uploading_image",      label: "Imagem" },
   { key: "uploading_metadata",   label: "Metadados" },
   { key: "creating_mint",        label: "Mint Solana" },
-  { key: "registering_metadata", label: "On-chain" },
+  { key: "registering_metadata", label: "Metadados on-chain" },
+  { key: "creating_pool",        label: "Pool Raydium" },
   { key: "saving_to_db",         label: "Marketplace" },
 ] as const;
 

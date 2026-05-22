@@ -3,13 +3,12 @@
 /**
  * useTokenCreation — orchestrates the full token launch flow:
  *
- *  Step 1: Upload image to Supabase Storage
- *  Step 2: Upload off-chain metadata JSON to Irys/Arweave
- *  Step 3: Create SPL mint on Solana (3 transactions)
+ *  Step 1: Upload image → Supabase Storage
+ *  Step 2: Upload off-chain metadata JSON → Irys/Arweave
+ *  Step 3: Create SPL mint on Solana (3 transactions signed by Phantom)
  *  Step 4: Create on-chain Metaplex metadata account
- *  Step 5: Register token in the Navorix database
- *
- * Returns a `create()` function + step/loading/error state for UI progress.
+ *  Step 5: Create Raydium CPMM pool (when initialBuySol > 0)
+ *  Step 6: Register token + pool in the Navorix database
  */
 
 import { useState, useCallback } from "react";
@@ -22,7 +21,9 @@ import {
   uploadOffChainMetadata,
   createOnChainMetadata,
 } from "@/services/solana/metadataService";
+import { createCpmmPool } from "@/services/solana/raydiumService";
 import { registerToken } from "@/services/api/tokenApi";
+import { LAMPORTS_PER_SOL, solToTokensAtLaunch } from "@/config/solana";
 import type { TokenCreateInput } from "@/types/token";
 
 export type CreationStep =
@@ -31,15 +32,17 @@ export type CreationStep =
   | "uploading_metadata"
   | "creating_mint"
   | "registering_metadata"
+  | "creating_pool"
   | "saving_to_db"
   | "done"
   | "error";
 
 export interface CreationResult {
-  mintAddress: string;
+  mintAddress:  string;
   mintSignature: string;
-  imageUrl: string;
-  metadataUri: string;
+  imageUrl:     string;
+  metadataUri:  string;
+  poolId?:      string;
 }
 
 const STEP_LABELS: Record<CreationStep, string> = {
@@ -48,7 +51,8 @@ const STEP_LABELS: Record<CreationStep, string> = {
   uploading_metadata:   "Subindo metadados para Arweave...",
   creating_mint:        "Criando token na Solana (3 transações)...",
   registering_metadata: "Registrando metadados on-chain...",
-  saving_to_db:         "Salvando no banco de dados...",
+  creating_pool:        "Criando pool de liquidez Raydium...",
+  saving_to_db:         "Salvando no marketplace...",
   done:                 "Token criado com sucesso!",
   error:                "Erro na criação",
 };
@@ -74,25 +78,21 @@ export function useTokenCreation() {
     try {
       const creatorWallet = wallet.publicKey.toBase58();
 
-      // ── Step 1: Upload image ──────────────────────────────
+      // ── Step 1: Upload imagem ─────────────────────────────────
       let imageUrl = "";
       if (input.image) {
         setStep("uploading_image");
-        // Use a temporary placeholder mint address for the path
         const tempId = `tmp_${Date.now()}`;
         imageUrl = await uploadTokenImage(input.image, tempId);
         toast.success("Imagem enviada ✓");
       }
 
-      // ── Step 2: Upload off-chain metadata JSON ────────────
+      // ── Step 2: Metadados off-chain (Arweave) ─────────────────
       setStep("uploading_metadata");
       const metadataJson = buildMetadataJson({
-        name:          input.name,
-        symbol:        input.symbol,
-        description:   input.description,
-        imageUrl,
-        mintAddress:   "pending",   // filled after mint
-        creatorWallet,
+        name: input.name, symbol: input.symbol,
+        description: input.description, imageUrl,
+        mintAddress: "pending", creatorWallet,
       });
 
       let metadataUri = "";
@@ -101,51 +101,81 @@ export function useTokenCreation() {
         metadataUri = await uploadOffChainMetadata(wallet.adapter, metadataJson);
         toast.success("Metadados enviados ✓");
       } catch {
-        // Non-fatal: continue without Arweave URI on devnet
         metadataUri = `https://navorix.exchange/tokens/meta/${input.symbol.toLowerCase()}.json`;
         toast.info("Arweave indisponível — usando URI padrão");
       }
 
-      // ── Step 3: Create SPL mint (3 on-chain transactions) ─
+      // ── Step 3: Criar mint SPL (3 txs no Phantom) ────────────
       setStep("creating_mint");
       toast.loading("Aguardando assinaturas no Phantom...", { id: "mint" });
-
       const mintResult = await createSplToken(connection, wallet, input);
       toast.dismiss("mint");
-      toast.success(`Mint criado: ${mintResult.mintAddress.slice(0, 8)}... ✓`);
+      toast.success(`Mint criado ✓`);
 
-      // ── Step 4: On-chain Metaplex metadata ───────────────
+      // ── Step 4: Metadados on-chain (Metaplex) ─────────────────
       setStep("registering_metadata");
       try {
         // @ts-expect-error — wallet adapter type mismatch
         await createOnChainMetadata(wallet.adapter, mintResult.mintAddress, metadataUri, input.name, input.symbol);
-        toast.success("Metadados on-chain registrados ✓");
+        toast.success("Metadados on-chain ✓");
       } catch {
-        // Metadata is optional — token works without it
         toast.info("Metadados on-chain: registre manualmente depois");
       }
 
-      // ── Step 5: Save to Navorix DB ────────────────────────
+      // ── Step 5: Criar pool Raydium CPMM ──────────────────────
+      let poolId: string | undefined;
+
+      if (input.initialBuySol > 0) {
+        setStep("creating_pool");
+        toast.loading("Criando pool Raydium...", { id: "pool" });
+
+        try {
+          const tokensForPool = solToTokensAtLaunch(input.initialBuySol);
+          const tokenDecimals = input.decimals;
+
+          const poolResult = await createCpmmPool(connection, wallet, {
+            mintAddress:       mintResult.mintAddress,
+            solAmountLamports: Math.floor(input.initialBuySol * LAMPORTS_PER_SOL),
+            tokenAmount:       tokensForPool * 10 ** tokenDecimals,
+            decimals:          tokenDecimals,
+          });
+
+          poolId = poolResult.poolId;
+          toast.dismiss("pool");
+          toast.success(`Pool Raydium criada ✓`);
+        } catch (poolErr) {
+          toast.dismiss("pool");
+          // Pool creation failure is non-fatal — token still exists
+          toast.error(
+            `Pool não criada: ${poolErr instanceof Error ? poolErr.message : "erro"}. ` +
+            "Você pode criar a pool depois manualmente."
+          );
+        }
+      }
+
+      // ── Step 6: Salvar no banco ───────────────────────────────
       setStep("saving_to_db");
       await registerToken({
-        mintAddress:   mintResult.mintAddress,
-        name:          input.name,
-        symbol:        input.symbol,
-        description:   input.description,
+        mintAddress:    mintResult.mintAddress,
+        name:           input.name,
+        symbol:         input.symbol,
+        description:    input.description,
         imageUrl,
-        decimals:      input.decimals,
-        initialSupply: input.initialSupply,
+        decimals:       input.decimals,
+        initialSupply:  input.initialSupply,
         creatorWallet,
-        creationTx:    mintResult.mintSignature,
-        initialBuySol: input.initialBuySol,
+        creationTx:     mintResult.mintSignature,
+        initialBuySol:  input.initialBuySol,
+        raydiumPoolId:  poolId,
       });
       toast.success("Registrado no marketplace ✓");
 
       const final: CreationResult = {
-        mintAddress:  mintResult.mintAddress,
+        mintAddress:   mintResult.mintAddress,
         mintSignature: mintResult.mintSignature,
         imageUrl,
         metadataUri,
+        poolId,
       };
 
       setStep("done");
@@ -157,6 +187,7 @@ export function useTokenCreation() {
       setStep("error");
       setError(msg);
       toast.dismiss("mint");
+      toast.dismiss("pool");
       toast.error(msg);
       return null;
     }
@@ -173,7 +204,7 @@ export function useTokenCreation() {
     reset,
     step,
     stepLabel: STEP_LABELS[step],
-    loading: !["idle", "done", "error"].includes(step),
+    loading:   !["idle", "done", "error"].includes(step),
     error,
     result,
   };

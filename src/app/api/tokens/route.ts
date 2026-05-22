@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       creatorWallet,
       creationTx,
       initialBuySol = 0,
+      raydiumPoolId,     // optional — set after CPMM pool is created
     } = body;
 
     // Basic validation
@@ -93,11 +94,13 @@ export async function POST(req: NextRequest) {
       creation_tx:        creationTx ?? null,
     });
 
-    // Bootstrap the pool with the initial buy SOL as starting reserve
+    // Bootstrap the pool record.
+    // If a real Raydium pool was created, store its ID.
     await upsertPool({
       mintAddress,
       solReserve:   Number(initialBuySol),
       tokenReserve: Number(initialSupply) - initialBuyTokens,
+      raydiumPoolId: raydiumPoolId ?? null,
     });
 
     return NextResponse.json(token, { status: 201 });
