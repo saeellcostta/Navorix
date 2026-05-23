@@ -29,7 +29,7 @@ const WALLET_META: Record<string, WalletMeta> = {
   Solflare: {
     icon:           "https://solflare.com/assets/logo.svg",
     installUrl:     "https://solflare.com/download",
-    mobileDeepLink: `https://solflare.com/ul/v1/browse/${enc(SITE_URL)}?ref=${enc(SITE_URL)}`,
+    mobileDeepLink: `https://solflare.com/ul/browse/${enc(SITE_URL)}`,
   },
   Backpack: {
     icon:           "https://backpack.app/apple-touch-icon.png",
@@ -143,24 +143,20 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
       try { await disconnect(); } catch { /* ignore */ }
     }
 
-    // Carteira instalada ou WalletConnect → select + connect
     if (isInstalled || isWC || isPhantomBrowser) {
       select(walletName as Parameters<typeof select>[0]);
       onClose();
-      // Chama connect() após o select() ser processado
       setTimeout(() => {
         connect().catch(() => {});
       }, 150);
       return;
     }
 
-    // Mobile sem carteira instalada → mostra opções
     if (isMobile && meta) {
       setSelectedWallet({ name: walletName, meta });
       return;
     }
 
-    // Desktop sem extensão → abre página de instalação
     if (meta?.installUrl) {
       window.open(meta.installUrl, "_blank", "noopener");
     }
@@ -214,7 +210,6 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
     );
   };
 
-  // Tela de opções para carteira não instalada no mobile
   if (selectedWallet) {
     const { name, meta } = selectedWallet;
     const icon = WALLET_META[name]?.icon || "";
