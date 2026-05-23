@@ -1,42 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink, Smartphone } from "lucide-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-react";
 import { useNavorixWallet } from "@/contexts/WalletContext";
 import { useSolBalance } from "@/hooks/useSolBalance";
-import {
-  isPhantomMobileRequired,
-  isInsidePhantomBrowser,
-  openInPhantomBrowser,
-  clearPhantomUrlParams,
-} from "@/lib/phantomMobile";
+import { clearPhantomUrlParams } from "@/lib/phantomMobile";
+import { WalletSelectModal } from "./WalletSelectModal";
 import { cn } from "@/lib/utils";
 
 export function WalletButton() {
   const { connected, connecting, publicKeyStr, shortAddress, disconnectWallet } =
     useNavorixWallet();
-  const { setVisible } = useWalletModal();
   const { balance } = useSolBalance();
-  const [open, setOpen]   = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [open, setOpen]         = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [copied, setCopied]     = useState(false);
 
-  // Detect mobile on mount + limpa erros do Phantom na URL
   useEffect(() => {
-    setIsMobile(isPhantomMobileRequired());
-    clearPhantomUrlParams(); // remove ?errorCode=500&errorMessage=... da URL
+    clearPhantomUrlParams();
   }, []);
-
-  const handleConnect = () => {
-    if (isMobile && !isInsidePhantomBrowser()) {
-      // Mobile sem extensão: abre o site dentro do browser do Phantom
-      openInPhantomBrowser();
-    } else {
-      // Desktop ou já dentro do Phantom browser: usa wallet modal normal
-      setVisible(true);
-    }
-  };
 
   const copyAddress = async () => {
     if (!publicKeyStr) return;
@@ -47,26 +29,24 @@ export function WalletButton() {
 
   if (!connected) {
     return (
-      <button
-        onClick={handleConnect}
-        disabled={connecting}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-lg px-4 py-2",
-          "border border-[var(--border-strong)] text-[var(--gold)] text-sm font-semibold",
-          "bg-[var(--gold-dim)] hover:bg-[rgba(251,191,36,0.2)]",
-          "transition-all duration-200 hover:shadow-[var(--gold-glow)]",
-          "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-        )}
-      >
-        {isMobile ? (
-          <Smartphone className="h-4 w-4" />
-        ) : (
+      <>
+        <button
+          onClick={() => setModalOpen(true)}
+          disabled={connecting}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-lg px-4 py-2",
+            "border border-[var(--border-strong)] text-[var(--gold)] text-sm font-semibold",
+            "bg-[var(--gold-dim)] hover:bg-[rgba(251,191,36,0.2)]",
+            "transition-all duration-200 hover:shadow-[var(--gold-glow)]",
+            "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+          )}
+        >
           <Wallet className="h-4 w-4" />
-        )}
-        {connecting
-          ? "Conectando..."
-          : "Conectar Carteira"}
-      </button>
+          {connecting ? "Conectando..." : "Conectar Carteira"}
+        </button>
+
+        <WalletSelectModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      </>
     );
   }
 
@@ -103,13 +83,11 @@ export function WalletButton() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div
-            className={cn(
-              "absolute right-0 top-full mt-2 z-40 w-56",
-              "rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)]",
-              "shadow-2xl shadow-black/60 py-1"
-            )}
-          >
+          <div className={cn(
+            "absolute right-0 top-full mt-2 z-40 w-56",
+            "rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)]",
+            "shadow-2xl shadow-black/60 py-1"
+          )}>
             <div className="px-4 py-3 border-b border-[var(--border)]">
               <p className="text-xs text-[var(--text-muted)] mb-1">Carteira conectada</p>
               <p className="text-sm font-mono text-[var(--gold)] break-all">{shortAddress}</p>
@@ -122,13 +100,9 @@ export function WalletButton() {
 
             <button
               onClick={copyAddress}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)] transition-colors"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
             >
-              {copied ? (
-                <Check className="h-4 w-4 text-[var(--positive)]" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {copied ? <Check className="h-4 w-4 text-[var(--positive)]" /> : <Copy className="h-4 w-4" />}
               {copied ? "Copiado!" : "Copiar endereço"}
             </button>
 
@@ -147,7 +121,7 @@ export function WalletButton() {
 
             <button
               onClick={() => { disconnectWallet(); setOpen(false); }}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#ef4444] hover:bg-[rgba(239,68,68,0.08)] transition-colors"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#ef4444] hover:bg-[rgba(239,68,68,0.08)] transition-colors cursor-pointer"
             >
               <LogOut className="h-4 w-4" />
               Desconectar
