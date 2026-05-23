@@ -8,8 +8,8 @@ import { useSolBalance } from "@/hooks/useSolBalance";
 import {
   isPhantomMobileRequired,
   isInsidePhantomBrowser,
-  openPhantomConnect,
-  parsePhantomCallbackParams,
+  openInPhantomBrowser,
+  clearPhantomUrlParams,
 } from "@/lib/phantomMobile";
 import { cn } from "@/lib/utils";
 
@@ -22,24 +22,18 @@ export function WalletButton() {
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile on mount
+  // Detect mobile on mount + limpa erros do Phantom na URL
   useEffect(() => {
     setIsMobile(isPhantomMobileRequired());
-
-    // Handle Phantom callback after mobile connection
-    if (isInsidePhantomBrowser()) return; // Already inside Phantom — use adapter
-    const { errorCode, errorMessage } = parsePhantomCallbackParams();
-    if (errorCode) {
-      console.warn("Phantom mobile error:", errorCode, errorMessage);
-    }
+    clearPhantomUrlParams(); // remove ?errorCode=500&errorMessage=... da URL
   }, []);
 
   const handleConnect = () => {
     if (isMobile && !isInsidePhantomBrowser()) {
-      // Mobile: redirect to Phantom app via deep link
-      openPhantomConnect();
+      // Mobile sem extensão: abre o site dentro do browser do Phantom
+      openInPhantomBrowser();
     } else {
-      // Desktop / Phantom browser: use wallet modal
+      // Desktop ou já dentro do Phantom browser: usa wallet modal normal
       setVisible(true);
     }
   };

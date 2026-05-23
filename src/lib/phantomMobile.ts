@@ -1,38 +1,29 @@
 /**
- * Phantom Mobile Deep Link Utility
+ * Phantom Mobile Utility
  *
- * Handles wallet connection on mobile browsers where the Phantom
- * browser extension is not available.
+ * Para web apps mobile, o fluxo correto é:
+ *   Abrir o site DENTRO do browser embutido do Phantom
+ *   → carteira conectada automaticamente
  *
- * Flow (Chrome Android / iOS Safari):
- *  1. User taps "Connect Wallet" on mobile
- *  2. We detect: no window.phantom → mobile browser
- *  3. Build a Phantom deep link URL: https://phantom.app/ul/v1/connect
- *  4. Encode dapp URL + callback URI as params
- *  5. Redirect user → Phantom app opens, user approves
- *  6. Phantom redirects back to our app with the public key
- *  7. We read the public key from the URL params
+ * URL: https://phantom.app/ul/browse/{siteUrl}?ref={siteUrl}
  *
- * Reference: https://docs.phantom.app/phantom-deeplinks/deeplinks-ios-and-android
+ * NÃO usar o protocolo /connect com criptografia — esse é para apps nativos.
  */
 
 import { SITE_URL } from "@/config/site";
 
-const PHANTOM_DEEPLINK_BASE = "https://phantom.app/ul/v1";
-
 /**
- * Returns true when running on a mobile browser WITHOUT the Phantom extension.
- * On desktop, Phantom injects window.phantom so this returns false.
+ * Retorna true quando no mobile SEM a extensão Phantom instalada.
  */
 export function isPhantomMobileRequired(): boolean {
   if (typeof window === "undefined") return false;
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const hasPhantomExtension = !!(window as { phantom?: unknown }).phantom;
-  return isMobile && !hasPhantomExtension;
+  const hasExtension = !!(window as { phantom?: unknown }).phantom;
+  return isMobile && !hasExtension;
 }
 
 /**
- * Returns true if the app is running inside the Phantom in-app browser.
+ * Retorna true quando rodando dentro do browser embutido do Phantom.
  */
 export function isInsidePhantomBrowser(): boolean {
   if (typeof window === "undefined") return false;
@@ -40,54 +31,31 @@ export function isInsidePhantomBrowser(): boolean {
 }
 
 /**
- * Build the Phantom deep link URL for connecting a wallet.
- *
- * @param redirectPath — path to redirect to after connection (default: current page)
- * @returns Full Phantom deep link URL
+ * Redireciona o usuário para abrir o site no browser do Phantom.
+ * Depois disso, a carteira estará disponível normalmente via wallet adapter.
  */
-export function buildPhantomConnectUrl(redirectPath?: string): string {
-  const appUrl  = SITE_URL;
-  const redirect = `${SITE_URL}${redirectPath ?? window.location.pathname}`;
-
-  const params = new URLSearchParams({
-    dapp_encryption_public_key: "", // Not needed for basic connect
-    cluster:   "mainnet-beta",
-    app_url:   appUrl,
-    redirect_link: redirect,
-  });
-
-  return `${PHANTOM_DEEPLINK_BASE}/connect?${params.toString()}`;
-}
-
-/**
- * Redirect to Phantom app for wallet connection (mobile only).
- * On desktop the standard wallet modal is used instead.
- */
-export function openPhantomConnect(redirectPath?: string): void {
+export function openInPhantomBrowser(): void {
   if (typeof window === "undefined") return;
-  const url = buildPhantomConnectUrl(redirectPath);
-  window.location.href = url;
+
+  const currentUrl = window.location.href;
+  const encodedUrl = encodeURIComponent(currentUrl);
+  const encodedRef = encodeURIComponent(SITE_URL);
+
+  // Abre o site dentro do Phantom in-app browser
+  window.location.href = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedRef}`;
 }
 
 /**
- * Parse the public key from URL params after Phantom redirects back.
- * Call this on page load if isPhantomMobileRequired() was true.
- *
- * @returns Solana public key string, or null if not present
+ * Limpa os parâmetros de erro do Phantom da URL sem recarregar a página.
  */
-export function parsePhantomCallbackParams(): {
-  publicKey: string | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-} {
-  if (typeof window === "undefined") {
-    return { publicKey: null, errorCode: null, errorMessage: null };
-  }
+export function clearPhantomUrlParams(): void {
+  if (typeof window === "undefined") return;
 
   const params = new URLSearchParams(window.location.search);
-  return {
-    publicKey:    params.get("phantom_encryption_public_key") ?? params.get("public_key"),
-    errorCode:    params.get("errorCode"),
-    errorMessage: params.get("errorMessage"),
-  };
+  if (params.has("errorCode") || params.has("errorMessage")) {
+    params.delete("errorCode");
+    params.delete("errorMessage");
+    const newUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
+    window.history.replaceState({}, "", newUrl);
+  }
 }
