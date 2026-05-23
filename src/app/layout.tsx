@@ -7,6 +7,7 @@ import { WalletContextProvider } from "@/contexts/WalletContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { WalletBrowserBanner } from "@/components/wallet/WalletBrowserBanner";
 import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from "@/config/site";
 
 const geistSans = Geist({
@@ -120,6 +121,7 @@ export default function RootLayout({
             </main>
 
             <Footer />
+            <WalletBrowserBanner />
 
             <Toaster
             theme="dark"

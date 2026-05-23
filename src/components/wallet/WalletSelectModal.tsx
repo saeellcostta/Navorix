@@ -62,12 +62,15 @@ const WALLET_META: Record<string, WalletMeta> = {
   "Bitget Wallet": {
     icon:           "https://web3.bitget.com/favicon.ico",
     installUrl:     "https://web3.bitget.com/en/wallet-download",
-    mobileDeepLink: `https://bkcode.vip?action=dapp&url=${enc(SITE_URL)}`,
+    // Bitget: abre o site dentro do browser da carteira
+    mobileDeepLink: `bitkeep://bkconnect?action=dapp&url=${enc(SITE_URL)}`,
+    label:          "Bitget Wallet",
   },
   Bitget: {
     icon:           "https://web3.bitget.com/favicon.ico",
     installUrl:     "https://web3.bitget.com/en/wallet-download",
-    mobileDeepLink: `https://bkcode.vip?action=dapp&url=${enc(SITE_URL)}`,
+    mobileDeepLink: `bitkeep://bkconnect?action=dapp&url=${enc(SITE_URL)}`,
+    label:          "Bitget Wallet",
   },
   Ledger: {
     icon:           "https://www.ledger.com/wp-content/uploads/2021/11/Ledger_favicon.png",
