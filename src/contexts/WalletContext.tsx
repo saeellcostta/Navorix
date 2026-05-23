@@ -41,15 +41,60 @@ interface NavorixWalletContextValue {
 
 const NavorixWalletContext = createContext<NavorixWalletContextValue | null>(null);
 
+/**
+ * Detecta qual browser de carteira está sendo usado e retorna o nome do adapter.
+ * Chamado uma vez no mount para auto-selecionar a carteira correta.
+ */
+function detectInjectedWallet(): string | null {
+  if (typeof window === "undefined") return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+
+  if (w.phantom?.solana)   return "Phantom";
+  if (w.solflare)          return "Solflare";
+  if (w.trustwallet)       return "Trust Wallet";
+  if (w.bitkeep?.solana)   return "Bitget Wallet";
+  if (w.backpack)          return "Backpack";
+  if (w.coinbaseSolana)    return "Coinbase Wallet";
+
+  // Fallback: verifica pelo userAgent
+  const ua = navigator.userAgent;
+  if (ua.includes("Phantom"))   return "Phantom";
+  if (ua.includes("Solflare"))  return "Solflare";
+  if (ua.includes("Trust"))     return "Trust Wallet";
+
+  return null;
+}
+
 function NavorixWalletContextBridge({ children }: { children: React.ReactNode }) {
-  const { publicKey, connected, connecting, disconnect } = useWallet();
-  const upsertedRef = useRef<string | null>(null);
+  const { publicKey, connected, connecting, disconnect, select, wallets } = useWallet();
+  const upsertedRef    = useRef<string | null>(null);
+  const autoSelected   = useRef(false);
 
   const publicKeyStr = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
   const shortAddress = useMemo(() => {
     if (!publicKeyStr) return null;
     return `${publicKeyStr.slice(0, 4)}...${publicKeyStr.slice(-4)}`;
   }, [publicKeyStr]);
+
+  // Auto-seleciona a carteira quando o site abre dentro de um wallet browser
+  useEffect(() => {
+    if (connected || connecting || autoSelected.current) return;
+    if (wallets.length === 0) return;
+
+    const detected = detectInjectedWallet();
+    if (!detected) return;
+
+    const match = wallets.find(w =>
+      w.adapter.name === detected ||
+      w.adapter.name.toLowerCase().includes(detected.toLowerCase())
+    );
+
+    if (match && (match.readyState === "Installed" || match.readyState === "Loadable")) {
+      autoSelected.current = true;
+      select(match.adapter.name);
+    }
+  }, [connected, connecting, wallets, select]);
 
   // Upsert user record in DB whenever a new wallet connects
   useEffect(() => {
