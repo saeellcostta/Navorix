@@ -18,6 +18,7 @@ import { useSolBalance } from "@/hooks/useSolBalance";
 import { useTokenCreation } from "@/hooks/useTokenCreation";
 import { TOKEN_CREATION_FEE_SOL, totalLaunchCostSol } from "@/config/solana";
 import { formatCompact } from "@/utils/format";
+import { cn } from "@/lib/utils";
 import type { TokenCreateInput } from "@/types/token";
 
 const DEFAULTS: TokenCreateInput = {
@@ -303,12 +304,82 @@ export function TokenCreatorForm() {
           <Card>
             <CardHeader><CardTitle>Parâmetros do Token</CardTitle></CardHeader>
             <CardBody className="space-y-4">
-              <Input label="Decimais" type="number" min={0} max={9} value={form.decimals}
-                onChange={e => setForm(f => ({ ...f, decimals: parseInt(e.target.value) || 6 }))}
-                hint="Padrão: 6" />
-              <Input label="Supply total" type="number" min={1} value={form.initialSupply}
-                onChange={e => setForm(f => ({ ...f, initialSupply: parseInt(e.target.value) || 1_000_000_000 }))}
-                hint="Quantidade total de tokens a mintar" />
+              {/* Decimais — seletor de opções comuns */}
+              <div>
+                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                  Decimais
+                  <span className="ml-2 text-xs text-[var(--text-muted)] font-normal">
+                    — define a menor fração do token
+                  </span>
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 0, label: "0",       hint: "Token inteiro (sem fração)" },
+                    { value: 6, label: "6",       hint: "Padrão Solana (como USDC)" },
+                    { value: 9, label: "9",       hint: "Alta precisão (como SOL)" },
+                  ].map(({ value, label, hint }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, decimals: value }))}
+                      className={cn(
+                        "flex flex-col items-center rounded-xl py-2.5 px-2 border transition-all cursor-pointer",
+                        form.decimals === value
+                          ? "border-[var(--gold)] bg-[var(--gold-dim)] text-[var(--gold)]"
+                          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+                      )}
+                    >
+                      <span className="text-lg font-extrabold">{label}</span>
+                      <span className="text-[10px] text-center leading-tight mt-0.5 opacity-70">{hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Supply total */}
+              <div>
+                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                  Supply Total
+                  <span className="ml-2 text-xs text-[var(--text-muted)] font-normal">
+                    — quantidade de tokens a criar
+                  </span>
+                </p>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {[
+                    { value: 1_000_000,       label: "1M" },
+                    { value: 1_000_000_000,   label: "1B" },
+                    { value: 1_000_000_000_000, label: "1T" },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, initialSupply: value }))}
+                      className={cn(
+                        "rounded-xl py-2 border text-sm font-bold transition-all cursor-pointer",
+                        form.initialSupply === value
+                          ? "border-[var(--gold)] bg-[var(--gold-dim)] text-[var(--gold)]"
+                          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  placeholder="Ou digite um valor personalizado..."
+                  type="number"
+                  min={1}
+                  value={form.initialSupply === 1_000_000 || form.initialSupply === 1_000_000_000 || form.initialSupply === 1_000_000_000_000
+                    ? ""
+                    : String(form.initialSupply)
+                  }
+                  onChange={e => {
+                    const v = parseInt(e.target.value);
+                    if (v > 0) setForm(f => ({ ...f, initialSupply: v }));
+                  }}
+                  hint={`Supply atual: ${formatCompact(form.initialSupply)} tokens`}
+                />
+              </div>
             </CardBody>
           </Card>
 
