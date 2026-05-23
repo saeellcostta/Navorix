@@ -24,18 +24,17 @@ export const LAMPORTS_PER_SOL = 1_000_000_000;
 export const TOKEN_CREATION_FEE_SOL = 0.02;
 
 /**
- * Initial buy pricing: how many tokens the creator receives per 1 SOL
- * when doing the optional pre-buy at launch.
+ * Percentual do supply que 1 SOL compra no lançamento.
+ * 1 SOL = 10% do supply total.
  *
- * Rate: 1 SOL → 100,000,000 tokens (100 million)
- *
- * Examples:
- *   0.01 SOL → 1,000,000  tokens (1 million)
- *   0.1  SOL → 10,000,000 tokens (10 million)
- *   0.25 SOL → 25,000,000 tokens (25 million)
- *   0.5  SOL → 50,000,000 tokens (50 million)
- *   1    SOL → 100,000,000 tokens (100 million)
+ * Exemplos:
+ *   Supply 1M  → 1 SOL = 100K tokens
+ *   Supply 1B  → 1 SOL = 100M tokens
+ *   Supply 1T  → 1 SOL = 100B tokens
  */
+export const SOL_BUYS_PCT_OF_SUPPLY = 0.10; // 10%
+
+/** Valor padrão para supply 1B (usado como fallback) */
 export const TOKENS_PER_SOL_AT_LAUNCH = 100_000_000;
 
 /**
@@ -84,10 +83,19 @@ export const FEE_WALLET_ADDRESS =
 
 /**
  * Calculate how many tokens a given SOL amount buys at launch rate.
- * Uses integer math to avoid floating-point drift.
+ * @param sol SOL amount
+ * @param supply Total token supply (default 1B)
  */
-export function solToTokensAtLaunch(sol: number): number {
-  return Math.floor(sol * TOKENS_PER_SOL_AT_LAUNCH);
+export function solToTokensAtLaunch(sol: number, supply = 1_000_000_000): number {
+  const tokensPerSol = supply * SOL_BUYS_PCT_OF_SUPPLY;
+  return Math.floor(sol * tokensPerSol);
+}
+
+/**
+ * How many tokens 1 SOL buys for a given supply.
+ */
+export function getTokensPerSol(supply: number): number {
+  return Math.floor(supply * SOL_BUYS_PCT_OF_SUPPLY);
 }
 
 /**

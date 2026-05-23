@@ -383,11 +383,12 @@ export function TokenCreatorForm() {
             </CardBody>
           </Card>
 
-          {/* ── Compra inicial ── */}
+          {/* ── Compra inicial — ligada ao supply e decimais ── */}
           <InitialBuyPanel
             value={form.initialBuySol}
             onChange={sol => setForm(f => ({ ...f, initialBuySol: sol }))}
             symbol={form.symbol || "TOKEN"}
+            supply={form.initialSupply}
           />
 
           {/* ── Resumo de custo ── */}

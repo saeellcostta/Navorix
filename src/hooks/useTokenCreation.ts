@@ -23,7 +23,7 @@ import {
 } from "@/services/solana/metadataService";
 import { createCpmmPool } from "@/services/solana/raydiumService";
 import { registerToken } from "@/services/api/tokenApi";
-import { LAMPORTS_PER_SOL, solToTokensAtLaunch } from "@/config/solana";
+import { LAMPORTS_PER_SOL, solToTokensAtLaunch, getTokensPerSol } from "@/config/solana";
 import type { TokenCreateInput } from "@/types/token";
 
 export type CreationStep =
@@ -136,7 +136,7 @@ export function useTokenCreation() {
         toast.loading("Criando pool Raydium...", { id: "pool" });
 
         try {
-          const tokensForPool = solToTokensAtLaunch(input.initialBuySol);
+          const tokensForPool = solToTokensAtLaunch(input.initialBuySol, input.initialSupply);
           const tokenDecimals = input.decimals;
 
           const poolResult = await createCpmmPool(connection, wallet, {

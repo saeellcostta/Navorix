@@ -6,25 +6,26 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
 import {
   INITIAL_BUY_PRESETS_SOL,
-  TOKENS_PER_SOL_AT_LAUNCH,
   MAX_INITIAL_BUY_SOL,
   solToTokensAtLaunch,
+  getTokensPerSol,
 } from "@/config/solana";
 import { formatCompact } from "@/utils/format";
 
 interface InitialBuyPanelProps {
-  /** Controlled value: SOL amount the creator wants to spend (0 = skip) */
   value: number;
   onChange: (sol: number) => void;
-  /** Token symbol for display */
   symbol: string;
+  /** Total token supply — used to calculate dynamic tokens/SOL rate */
+  supply?: number;
 }
 
-export function InitialBuyPanel({ value, onChange, symbol }: InitialBuyPanelProps) {
+export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_000 }: InitialBuyPanelProps) {
+  const tokensPerSol = getTokensPerSol(supply);
   const [expanded, setExpanded] = useState(false);
   const [customInput, setCustomInput] = useState("");
 
-  const tokensReceived = solToTokensAtLaunch(value);
+  const tokensReceived = solToTokensAtLaunch(value, supply);
   const isActive = value > 0;
 
   const handlePreset = (sol: number) => {
@@ -109,9 +110,9 @@ export function InitialBuyPanel({ value, onChange, symbol }: InitialBuyPanelProp
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               Taxa de lançamento:{" "}
               <span className="font-bold text-[var(--gold)]">
-                1 SOL = {formatCompact(TOKENS_PER_SOL_AT_LAUNCH)} tokens
+                1 SOL = {formatCompact(tokensPerSol)} {symbol || "tokens"}
               </span>
-              . Você é o primeiro comprador — vantagem de preço máxima.
+              {" "}(10% do supply). Você é o primeiro comprador.
             </p>
           </div>
 
@@ -142,11 +143,11 @@ export function InitialBuyPanel({ value, onChange, symbol }: InitialBuyPanelProp
                   >
                     {sol} SOL
                   </span>
-                  <span className="text-[10px] text-[var(--text-muted)] leading-tight">
-                    {formatCompact(solToTokensAtLaunch(sol))}
-                    <br />
-                    {symbol || "tokens"}
-                  </span>
+              <span className="text-[10px] text-[var(--text-muted)] leading-tight">
+                  {formatCompact(solToTokensAtLaunch(sol, supply))}
+                  <br />
+                  {symbol || "tokens"}
+                </span>
                 </button>
               ))}
             </div>
@@ -184,9 +185,11 @@ export function InitialBuyPanel({ value, onChange, symbol }: InitialBuyPanelProp
                   <p className="text-2xl font-extrabold text-[var(--gold)] tabular-nums">
                     {formatCompact(tokensReceived)}
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    ${symbol || "TOKEN"} por {value} SOL
-                  </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {symbol || "TOKEN"} por {value} SOL
+                {" "}·{" "}
+                {((value * tokensPerSol) / supply * 100).toFixed(1)}% do supply
+              </p>
                 </div>
               </div>
               {/* Breakdown bar */}

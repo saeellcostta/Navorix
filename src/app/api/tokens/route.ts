@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "name and symbol are required" }, { status: 400 });
     }
 
-    const initialBuyTokens = solToTokensAtLaunch(Number(initialBuySol));
+    const initialBuyTokens = solToTokensAtLaunch(Number(initialBuySol), Number(initialSupply));
 
     // Insert token record
     const token = await insertToken({
