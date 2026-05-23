@@ -17,8 +17,15 @@ import {
   useConnection,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
-import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
+import { PhantomWalletAdapter }   from "@solana/wallet-adapter-phantom";
+import { SolflareWalletAdapter }  from "@solana/wallet-adapter-solflare";
+import {
+  CoinbaseWalletAdapter,
+  TrustWalletAdapter,
+  BitgetWalletAdapter,
+  LedgerWalletAdapter,
+  TorusWalletAdapter,
+} from "@solana/wallet-adapter-wallets";
 import { SOLANA_NETWORK, SOLANA_RPC_ENDPOINT } from "@/config/solana";
 
 // Import default wallet adapter styles
@@ -83,9 +90,20 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   const wallets = useMemo(
     () => [
+      // ── Tier 1: mais populares ──
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter({ network }),
-      // BackpackWalletAdapter is injected via window.xnft — no explicit adapter needed
+
+      // ── Tier 2: muito usadas ──
+      new CoinbaseWalletAdapter(),   // Popular nos EUA
+      new TrustWalletAdapter(),      // Mais usada globalmente no mobile
+      new BitgetWalletAdapter(),     // Popular na Ásia (OKX, Bitget)
+
+      // ── Tier 3: hardware / outros ──
+      new LedgerWalletAdapter(),     // Hardware wallet — máxima segurança
+      new TorusWalletAdapter(),      // Login com Google/Twitter (sem seed phrase)
+
+      // Backpack é injetado via window.xnft — detectado automaticamente
     ],
     [network]
   );
