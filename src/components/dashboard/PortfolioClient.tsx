@@ -2,12 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Wallet, RefreshCw, ExternalLink, TrendingUp } from "lucide-react";
+import { RefreshCw, ExternalLink, TrendingUp, Wallet } from "lucide-react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useSolBalance } from "@/hooks/useSolBalance";
 import { getTokenAccounts } from "@/services/solana/tokenService";
-import { Button } from "@/components/ui/Button";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { shortenAddress, formatCompact } from "@/utils/format";
@@ -21,7 +20,6 @@ interface TokenHolding {
 
 export function PortfolioClient() {
   const { connected, publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const { balance, loading: solLoading, refresh: refreshSol } = useSolBalance();
 
@@ -64,10 +62,7 @@ export function PortfolioClient() {
             Veja saldo SOL, tokens e histórico de trades.
           </p>
         </div>
-        <Button onClick={() => setVisible(true)}>
-          <Wallet className="h-4 w-4" />
-          Conectar Carteira
-        </Button>
+        <ConnectWalletButton size="lg" />
       </div>
     );
   }

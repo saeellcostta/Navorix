@@ -4,12 +4,12 @@ import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { Upload, AlertTriangle, CheckCircle, Zap, ExternalLink, Loader2 } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { InitialBuyPanel } from "./InitialBuyPanel";
 import { LaunchCostSummary } from "./LaunchCostSummary";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { useSolBalance } from "@/hooks/useSolBalance";
 import { useTokenCreation } from "@/hooks/useTokenCreation";
 import { TOKEN_CREATION_FEE_SOL, totalLaunchCostSol } from "@/config/solana";
@@ -38,7 +38,6 @@ const STEPS = [
 
 export function TokenCreatorForm() {
   const { connected } = useWallet();
-  const { setVisible } = useWalletModal();
   const { balance } = useSolBalance();
   const { create, reset, step, stepLabel, loading, error, result } = useTokenCreation();
 
@@ -63,7 +62,7 @@ export function TokenCreatorForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!connected) { setVisible(true); return; }
+    if (!connected) return;
     await create(form);
   };
 
@@ -307,20 +306,22 @@ export function TokenCreatorForm() {
       />
 
       {/* CTA */}
-      <Button
-        type="submit"
-        size="xl"
-        className="w-full"
-        loading={loading}
-        leftIcon={<Zap className="h-5 w-5" />}
-        disabled={connected && !hasEnoughSol}
-      >
-        {!connected
-          ? "Conectar Carteira"
-          : form.initialBuySol > 0
+      {!connected ? (
+        <ConnectWalletButton size="xl" className="w-full" />
+      ) : (
+        <Button
+          type="submit"
+          size="xl"
+          className="w-full"
+          loading={loading}
+          leftIcon={<Zap className="h-5 w-5" />}
+          disabled={!hasEnoughSol}
+        >
+          {form.initialBuySol > 0
             ? `Criar ${form.symbol || "Token"} · Comprar ${form.initialBuySol} SOL`
             : `Criar ${form.symbol || "Token"} na Solana`}
-      </Button>
+        </Button>
+      )}
 
       <p className="text-center text-xs text-[var(--text-muted)]">
         Dados imutáveis após criação · Taxa: {TOKEN_CREATION_FEE_SOL} SOL

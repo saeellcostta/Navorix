@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { ArrowUpDown, Info, Loader2, ExternalLink, AlertTriangle } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { useSwap } from "@/hooks/useSwap";
 import { formatPct, formatCompact } from "@/utils/format";
 import { DEFAULT_SLIPPAGE_PCT } from "@/config/solana";
@@ -20,7 +20,6 @@ interface TradePanelProps {
 
 export function TradePanel({ mintAddress, tokenSymbol, poolId }: TradePanelProps) {
   const { connected } = useWallet();
-  const { setVisible } = useWalletModal();
 
   const [direction, setDirection] = useState<"buy" | "sell">("buy");
   const [amountIn, setAmountIn]   = useState("");
@@ -39,7 +38,7 @@ export function TradePanel({ mintAddress, tokenSymbol, poolId }: TradePanelProps
   });
 
   const handleSwap = async () => {
-    if (!connected) { setVisible(true); return; }
+    if (!connected) return;
     const sig = await execute();
     if (sig) {
       setLastSig(sig);
@@ -178,24 +177,26 @@ export function TradePanel({ mintAddress, tokenSymbol, poolId }: TradePanelProps
         )}
 
         {/* CTA */}
-        <Button
-          variant={isBuy ? "buy" : "sell"}
-          size="lg"
-          className="w-full"
-          onClick={handleSwap}
-          loading={executing}
-          disabled={noPool || parsedAmount <= 0 || quoteLoading}
-        >
-          {!connected
-            ? "Conectar Carteira"
-            : noPool
+        {!connected ? (
+          <ConnectWalletButton size="lg" className="w-full" />
+        ) : (
+          <Button
+            variant={isBuy ? "buy" : "sell"}
+            size="lg"
+            className="w-full"
+            onClick={handleSwap}
+            loading={executing}
+            disabled={noPool || parsedAmount <= 0 || quoteLoading}
+          >
+            {noPool
               ? "Sem liquidez disponível"
               : executing
                 ? isBuy ? "Comprando..." : "Vendendo..."
                 : isBuy
                   ? `Comprar ${tokenSymbol}`
                   : `Vender ${tokenSymbol}`}
-        </Button>
+          </Button>
+        )}
 
         {/* Last transaction */}
         {lastSig && (
