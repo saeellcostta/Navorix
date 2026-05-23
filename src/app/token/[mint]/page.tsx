@@ -13,6 +13,7 @@ import { getTokenByMint } from "@/services/db/tokenDbService";
 import { getPoolByMint } from "@/services/db/poolDbService";
 import { isValidPublicKey } from "@/utils/validation";
 import { formatUsd, formatCompact, shortenAddress, timeAgo } from "@/utils/format";
+import { Share2, MessageCircle, Globe } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ mint: string }>;
@@ -62,6 +63,13 @@ export default async function TokenDetailPage({ params }: PageProps) {
         {/* ── Left column (2/3) ── */}
         <div className="lg:col-span-2 space-y-5">
 
+          {/* Banner */}
+          {token.bannerUrl && (
+            <div className="rounded-xl overflow-hidden h-40 w-full">
+              <Image src={token.bannerUrl} alt={`${token.name} banner`} width={900} height={160} className="w-full h-full object-cover" />
+            </div>
+          )}
+
           {/* Token header */}
           <div className="flex items-start gap-4">
             <div className="h-16 w-16 rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface-3)] shrink-0">
@@ -88,19 +96,42 @@ export default async function TokenDetailPage({ params }: PageProps) {
                 </div>
               )}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <a
-                  href={`https://solscan.io/token/${mint}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-[var(--gold)] hover:underline"
-                >
-                  {shortenAddress(mint, 6)}
-                  <ExternalLink className="h-3 w-3" />
+                <a href={`https://solscan.io/token/${mint}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-[var(--gold)] hover:underline">
+                  {shortenAddress(mint, 6)} <ExternalLink className="h-3 w-3" />
                 </a>
-                <span className="text-xs text-[var(--text-muted)]">
-                  Criado {timeAgo(token.createdAt)}
-                </span>
+                <span className="text-xs text-[var(--text-muted)]">Criado {timeAgo(token.createdAt)}</span>
               </div>
+
+              {/* Links sociais */}
+              {(token.social?.twitter || token.social?.telegram || token.social?.website || token.social?.discord) && (
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {token.social.twitter && (
+                    <a href={token.social.twitter} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors border border-[var(--border)] rounded-full px-2 py-0.5">
+                      <Share2 className="h-3 w-3" /> Twitter
+                    </a>
+                  )}
+                  {token.social.telegram && (
+                    <a href={token.social.telegram} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors border border-[var(--border)] rounded-full px-2 py-0.5">
+                      <MessageCircle className="h-3 w-3" /> Telegram
+                    </a>
+                  )}
+                  {token.social.website && (
+                    <a href={token.social.website} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors border border-[var(--border)] rounded-full px-2 py-0.5">
+                      <Globe className="h-3 w-3" /> Website
+                    </a>
+                  )}
+                  {token.social.discord && (
+                    <a href={token.social.discord} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors border border-[var(--border)] rounded-full px-2 py-0.5">
+                      <Users className="h-3 w-3" /> Discord
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

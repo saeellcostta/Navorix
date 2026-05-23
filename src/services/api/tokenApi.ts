@@ -59,12 +59,14 @@ export async function registerToken(input: {
   symbol:         string;
   description?:   string;
   imageUrl?:      string;
+  bannerUrl?:     string;
   decimals:       number;
   initialSupply:  number;
   creatorWallet:  string;
   creationTx:     string;
   initialBuySol:  number;
   raydiumPoolId?: string;
+  social?: { twitter?: string; telegram?: string; website?: string; discord?: string };
 }): Promise<Token> {
   return apiFetch<Token>("/tokens", {
     method: "POST",

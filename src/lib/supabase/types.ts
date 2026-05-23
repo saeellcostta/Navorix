@@ -41,6 +41,11 @@ export interface Database {
           symbol: string;
           description: string | null;
           image_url: string | null;
+          banner_url: string | null;
+          twitter_url: string | null;
+          telegram_url: string | null;
+          website_url: string | null;
+          discord_url: string | null;
           decimals: number;
           initial_supply: number;
           creator_wallet: string;
@@ -60,6 +65,11 @@ export interface Database {
           symbol: string;
           description?: string | null;
           image_url?: string | null;
+          banner_url?: string | null;
+          twitter_url?: string | null;
+          telegram_url?: string | null;
+          website_url?: string | null;
+          discord_url?: string | null;
           decimals?: number;
           initial_supply?: number;
           creator_wallet: string;

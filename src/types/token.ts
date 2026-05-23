@@ -4,10 +4,12 @@ export interface Token {
   symbol: string;
   description: string;
   imageUrl: string;
+  bannerUrl: string;
   decimals: number;
   supply: number;
   creator: string;
   createdAt: Date;
+  social: TokenSocialLinks;
   metadata?: TokenMetadata;
   stats?: TokenStats;
 }
@@ -36,15 +38,25 @@ export interface TokenStats {
   txCount24h: number;
 }
 
+export interface TokenSocialLinks {
+  twitter?:  string;
+  telegram?: string;
+  website?:  string;
+  discord?:  string;
+}
+
 export interface TokenCreateInput {
   name: string;
   symbol: string;
   description: string;
   image: File | null;
+  banner: File | null;
   decimals: number;
   initialSupply: number;
   /** Optional initial buy in SOL at launch rate (0 = skip) */
   initialBuySol: number;
+  /** Social links shown on token page */
+  social: TokenSocialLinks;
 }
 
 /**

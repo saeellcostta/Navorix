@@ -78,13 +78,19 @@ export function useTokenCreation() {
     try {
       const creatorWallet = wallet.publicKey.toBase58();
 
-      // ── Step 1: Upload imagem ─────────────────────────────────
-      let imageUrl = "";
-      if (input.image) {
+      // ── Step 1: Upload imagem + banner ───────────────────────
+      let imageUrl  = "";
+      let bannerUrl = "";
+      if (input.image || input.banner) {
         setStep("uploading_image");
         const tempId = `tmp_${Date.now()}`;
-        imageUrl = await uploadTokenImage(input.image, tempId);
-        toast.success("Imagem enviada ✓");
+        if (input.image) {
+          imageUrl  = await uploadTokenImage(input.image,  tempId, "logo");
+        }
+        if (input.banner) {
+          bannerUrl = await uploadTokenImage(input.banner, tempId, "banner");
+        }
+        toast.success("Mídia enviada ✓");
       }
 
       // ── Step 2: Metadados off-chain (Arweave) ─────────────────
@@ -161,12 +167,14 @@ export function useTokenCreation() {
         symbol:         input.symbol,
         description:    input.description,
         imageUrl,
+        bannerUrl,
         decimals:       input.decimals,
         initialSupply:  input.initialSupply,
         creatorWallet,
         creationTx:     mintResult.mintSignature,
         initialBuySol:  input.initialBuySol,
         raydiumPoolId:  poolId,
+        social:         input.social,
       });
       toast.success("Registrado no marketplace ✓");
 

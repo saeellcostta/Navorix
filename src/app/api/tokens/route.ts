@@ -57,12 +57,14 @@ export async function POST(req: NextRequest) {
       symbol,
       description,
       imageUrl,
+      bannerUrl,
       decimals = 6,
       initialSupply = 1_000_000_000,
       creatorWallet,
       creationTx,
       initialBuySol = 0,
-      raydiumPoolId,     // optional — set after CPMM pool is created
+      raydiumPoolId,
+      social = {},
     } = body;
 
     // Basic validation
@@ -85,6 +87,11 @@ export async function POST(req: NextRequest) {
       symbol:             symbol.trim().toUpperCase(),
       description:        description ?? null,
       image_url:          imageUrl ?? null,
+      banner_url:         bannerUrl ?? null,
+      twitter_url:        social.twitter  || null,
+      telegram_url:       social.telegram || null,
+      website_url:        social.website  || null,
+      discord_url:        social.discord  || null,
       decimals:           Number(decimals),
       initial_supply:     Number(initialSupply),
       creator_wallet:     creatorWallet,

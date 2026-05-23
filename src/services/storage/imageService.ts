@@ -23,14 +23,16 @@ function getClient() {
 
 /**
  * Upload a token image file to Supabase Storage.
+ * @param type "logo" | "banner"
  * Returns the public HTTPS URL.
  */
 export async function uploadTokenImage(
   file: File,
-  mintAddress: string
+  mintAddress: string,
+  type: "logo" | "banner" = "logo"
 ): Promise<string> {
   const ext  = file.name.split(".").pop()?.toLowerCase() ?? "png";
-  const path = `${mintAddress}/logo.${ext}`;
+  const path = `${mintAddress}/${type}.${ext}`;
 
   const supabase = getClient();
 
