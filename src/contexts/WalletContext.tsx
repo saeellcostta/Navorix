@@ -202,7 +202,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   return (
     <ConnectionProvider endpoint={SOLANA_RPC_ENDPOINT}>
-      <WalletProvider wallets={wallets} autoConnect>
+      <WalletProvider wallets={wallets} autoConnect={false}>
         <WalletModalProvider>
           <NavorixWalletContextBridge>{children}</NavorixWalletContextBridge>
         </WalletModalProvider>
