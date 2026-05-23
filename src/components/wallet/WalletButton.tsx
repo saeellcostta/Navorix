@@ -65,9 +65,7 @@ export function WalletButton() {
         )}
         {connecting
           ? "Conectando..."
-          : isMobile
-            ? "Abrir Phantom"
-            : "Conectar Carteira"}
+          : "Conectar Carteira"}
       </button>
     );
   }
