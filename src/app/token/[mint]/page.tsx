@@ -198,7 +198,7 @@ export default async function TokenDetailPage({ params }: PageProps) {
           <TradePanel
             mintAddress={mint}
             tokenSymbol={token.symbol}
-            poolId={pool?.id ?? null}
+            poolId={pool?.raydiumPoolId ?? null}
           />
 
           {/* Links externos */}
