@@ -1,6 +1,7 @@
 # Navorix Exchange
 
 **Premier Solana meme coin launchpad and decentralized exchange.**
+<!-- deploy trigger -->
 
 Built with Next.js 16 · TypeScript · TailwindCSS v4 · Solana Web3.js · SPL Token · Metaplex
 
