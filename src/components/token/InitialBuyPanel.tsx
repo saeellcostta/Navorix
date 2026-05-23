@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Coins, Zap, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { Coins, Zap, Info, ChevronDown, ChevronUp, AlertTriangle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
 import {
@@ -12,11 +12,12 @@ import {
 } from "@/config/solana";
 import { formatCompact } from "@/utils/format";
 
+const RAYDIUM_MIN_SOL = 0.3;
+
 interface InitialBuyPanelProps {
   value: number;
   onChange: (sol: number) => void;
   symbol: string;
-  /** Total token supply — used to calculate dynamic tokens/SOL rate */
   supply?: number;
 }
 
@@ -27,6 +28,7 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
 
   const tokensReceived = solToTokensAtLaunch(value, supply);
   const isActive = value > 0;
+  const hasMinLiquidity = value >= RAYDIUM_MIN_SOL;
 
   const handlePreset = (sol: number) => {
     onChange(sol);
@@ -116,6 +118,25 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
             </p>
           </div>
 
+          {/* Raydium minimum warning */}
+          {!isActive || !hasMinLiquidity ? (
+            <div className="flex items-start gap-2 rounded-lg border border-[#ef4444]/30 bg-[rgba(239,68,68,0.06)] p-3">
+              <AlertTriangle className="h-3.5 w-3.5 text-[#ef4444] shrink-0 mt-0.5" />
+              <p className="text-xs text-[#ef4444] leading-relaxed">
+                <span className="font-bold">Mínimo de {RAYDIUM_MIN_SOL} SOL</span> para criar pool e listar automaticamente no Raydium.
+                Abaixo disso o token é criado mas <span className="font-bold">não poderá ser negociado</span>.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 rounded-lg border border-[#22c55e]/30 bg-[rgba(34,197,94,0.06)] p-3">
+              <CheckCircle className="h-3.5 w-3.5 text-[#22c55e] shrink-0 mt-0.5" />
+              <p className="text-xs text-[#22c55e] leading-relaxed">
+                <span className="font-bold">Pool Raydium será criada automaticamente!</span>{" "}
+                Seu token ficará disponível para compra e venda imediatamente após o lançamento.
+              </p>
+            </div>
+          )}
+
           {/* Preset buttons */}
           <div>
             <p className="text-xs font-medium text-[var(--text-muted)] mb-2 uppercase tracking-wider">
@@ -143,11 +164,14 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
                   >
                     {sol} SOL
                   </span>
-              <span className="text-[10px] text-[var(--text-muted)] leading-tight">
-                  {formatCompact(solToTokensAtLaunch(sol, supply))}
-                  <br />
-                  {symbol || "tokens"}
-                </span>
+                  <span className="text-[10px] text-[var(--text-muted)] leading-tight">
+                    {formatCompact(solToTokensAtLaunch(sol, supply))}
+                    <br />
+                    {symbol || "tokens"}
+                  </span>
+                  {sol >= RAYDIUM_MIN_SOL && (
+                    <span className="text-[9px] text-[#22c55e] font-bold mt-0.5">✓ Raydium</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -167,7 +191,7 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
               rightAdornment={
                 <span className="text-xs font-semibold text-[var(--gold)]">SOL</span>
               }
-              hint={`Máximo ${MAX_INITIAL_BUY_SOL} SOL por criação`}
+              hint={`Mínimo ${RAYDIUM_MIN_SOL} SOL para listar no Raydium · Máximo ${MAX_INITIAL_BUY_SOL} SOL`}
             />
           </div>
 
@@ -185,11 +209,11 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
                   <p className="text-2xl font-extrabold text-[var(--gold)] tabular-nums">
                     {formatCompact(tokensReceived)}
                   </p>
-              <p className="text-xs text-[var(--text-muted)]">
-                {symbol || "TOKEN"} por {value} SOL
-                {" "}·{" "}
-                {((value * tokensPerSol) / supply * 100).toFixed(1)}% do supply
-              </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {symbol || "TOKEN"} por {value} SOL
+                    {" "}·{" "}
+                    {((value * tokensPerSol) / supply * 100).toFixed(1)}% do supply
+                  </p>
                 </div>
               </div>
               {/* Breakdown bar */}
