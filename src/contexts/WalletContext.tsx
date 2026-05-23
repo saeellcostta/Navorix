@@ -24,9 +24,12 @@ import {
   TrustWalletAdapter,
   BitgetWalletAdapter,
   LedgerWalletAdapter,
-  TorusWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
+import { WalletConnectWalletAdapter } from "@solana/wallet-adapter-walletconnect";
 import { SOLANA_NETWORK, SOLANA_RPC_ENDPOINT } from "@/config/solana";
+
+const WALLETCONNECT_PROJECT_ID =
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "fed21e678856ac560536a95a93178b11";
 
 // Import default wallet adapter styles
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -157,13 +160,28 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       new SolflareWalletAdapter({ network }),
 
       // ── Tier 2: muito usadas ──
-      new CoinbaseWalletAdapter(),   // Popular nos EUA
-      new TrustWalletAdapter(),      // Mais usada globalmente no mobile
-      new BitgetWalletAdapter(),     // Popular na Ásia (OKX, Bitget)
+      new CoinbaseWalletAdapter(),
+      new TrustWalletAdapter(),
+      new BitgetWalletAdapter(),
 
-      // ── Tier 3: hardware / outros ──
-      new LedgerWalletAdapter(),     // Hardware wallet — máxima segurança
-      new TorusWalletAdapter(),      // Login com Google/Twitter (sem seed phrase)
+      // ── Tier 3: hardware ──
+      new LedgerWalletAdapter(),
+
+      // ── WalletConnect: conecta Trust, Bitget, Coinbase e 300+ carteiras mobile ──
+      new WalletConnectWalletAdapter({
+        network: network === WalletAdapterNetwork.Testnet
+          ? WalletAdapterNetwork.Devnet
+          : network,
+        options: {
+          projectId: WALLETCONNECT_PROJECT_ID,
+          metadata: {
+            name:        "Navorix Exchange",
+            description: "Premier Solana meme coin launchpad and DEX",
+            url:         "https://navorix-exchange.vercel.app",
+            icons:       ["https://navorix-exchange.vercel.app/favicon.ico"],
+          },
+        },
+      }),
 
       // Backpack é injetado via window.xnft — detectado automaticamente
     ],

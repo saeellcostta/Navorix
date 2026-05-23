@@ -79,15 +79,23 @@ const WALLET_META: Record<string, WalletMeta> = {
   },
 };
 
-// Carteiras exibidas — Torus removido (abre Google login, confunde usuários)
+// WalletConnect info
+const WALLETCONNECT_INFO: WalletMeta = {
+  icon:        "https://avatars.githubusercontent.com/u/37784886",
+  installUrl:  "https://walletconnect.com",
+  label:       "WalletConnect (QR Code)",
+};
+
+// Carteiras exibidas
 const SHOW_WALLETS = [
   "Phantom",
   "Solflare",
   "Backpack",
   "Coinbase Wallet",
-  "Trust",          // adapter name é "Trust"
+  "Trust",
   "Bitget Wallet",
   "Ledger",
+  "WalletConnect",
 ];
 
 export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
@@ -155,7 +163,9 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
   const WalletRow = ({ wallet, isInstalled }: { wallet: typeof allWallets[0]; isInstalled: boolean }) => {
     const name = wallet.adapter.name;
     const meta = WALLET_META[name] ?? WALLET_META[name.split(" ")[0]] ?? null;
-    const icon = wallet.adapter.icon || meta?.icon || "";
+    const isWC = name === "WalletConnect";
+    const wcMeta = isWC ? WALLETCONNECT_INFO : null;
+    const icon = wallet.adapter.icon || meta?.icon || wcMeta?.icon || "";
     const showMobileOpen = isMobile && !isPhantomBrowser && !!meta?.mobileDeepLink;
 
     return (
