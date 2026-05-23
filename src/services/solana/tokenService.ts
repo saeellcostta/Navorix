@@ -14,9 +14,8 @@
  *    Signed by: wallet (fee payer) + ephemeral keypair (mint authority)
  *
  *  TX 3 — Mint supply:
- *    • getOrCreateAssociatedTokenAccount
- *    • mintTo(initialSupply - initialBuyTokens)  → creator ATA
- *    • if initialBuy > 0: mintTo(initialBuyTokens) → creator ATA
+ *    • createAssociatedTokenAccount
+ *    • mintTo(initialSupply) → creator ATA
  *
  * All transactions use wallet.signTransaction() — private key never stored.
  */
@@ -27,7 +26,6 @@ import {
   Transaction,
   SystemProgram,
   Keypair,
-  LAMPORTS_PER_SOL as WEB3_LAMPORTS,
 } from "@solana/web3.js";
 import {
   createInitializeMintInstruction,
@@ -49,9 +47,9 @@ import {
 import type { TokenCreateInput } from "@/types/token";
 
 export interface CreateTokenResult {
-  mintAddress: string;
-  feeSignature: string;
-  mintSignature: string;
+  mintAddress:    string;
+  feeSignature:   string;
+  mintSignature:  string;
   tokensReceived: number;
 }
 
@@ -68,11 +66,11 @@ export async function createSplToken(
     throw new Error("Carteira não conectada");
   }
 
-  const payer  = wallet.publicKey;
+  const payer     = wallet.publicKey;
   const feeWallet = new PublicKey(FEE_WALLET_ADDRESS);
 
-  // ── 1. Check balance ──────────────────────────────────────────
-  const balance = await connection.getBalance(payer);
+  // ── 1. Check balance ────────────────────────────────────────
+  const balance  = await connection.getBalance(payer);
   const required = Math.ceil(totalLaunchCostSol(input.initialBuySol) * LAMPORTS_PER_SOL) + 100_000;
   if (balance < required) {
     const need = (required / LAMPORTS_PER_SOL).toFixed(4);
@@ -81,10 +79,10 @@ export async function createSplToken(
   }
 
   const tokensReceived = solToTokensAtLaunch(input.initialBuySol);
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
 
-  // ── 2. TX 1: Platform fee + initial buy ───────────────────────
-  const feeTx = new Transaction({ recentBlockhash: blockhash, feePayer: payer });
+  // ── 2. TX 1: Platform fee + optional initial buy ─────────────
+  const { blockhash: bh1, lastValidBlockHeight: lv1 } = await connection.getLatestBlockhash();
+  const feeTx = new Transaction({ recentBlockhash: bh1, feePayer: payer });
 
   feeTx.add(SystemProgram.transfer({
     fromPubkey: payer,
@@ -102,59 +100,56 @@ export async function createSplToken(
 
   const signedFeeTx  = await wallet.signTransaction(feeTx);
   const feeSignature = await connection.sendRawTransaction(signedFeeTx.serialize());
-  await connection.confirmTransaction({ signature: feeSignature, blockhash, lastValidBlockHeight });
+  await connection.confirmTransaction({ signature: feeSignature, blockhash: bh1, lastValidBlockHeight: lv1 }, "confirmed");
 
-  // ── 3. TX 2: Create mint account ──────────────────────────────
-  // Generate ephemeral keypair — only used for this transaction
+  // ── 3. TX 2: Create mint account ────────────────────────────
   const mintKeypair  = Keypair.generate();
   const mintPubkey   = mintKeypair.publicKey;
   const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
 
   const { blockhash: bh2, lastValidBlockHeight: lv2 } = await connection.getLatestBlockhash();
-
   const mintTx = new Transaction({ recentBlockhash: bh2, feePayer: payer });
+
   mintTx.add(
     SystemProgram.createAccount({
-      fromPubkey:           payer,
-      newAccountPubkey:     mintPubkey,
-      space:                MINT_SIZE,
-      lamports:             rentLamports,
-      programId:            TOKEN_PROGRAM_ID,
+      fromPubkey:       payer,
+      newAccountPubkey: mintPubkey,
+      space:            MINT_SIZE,
+      lamports:         rentLamports,
+      programId:        TOKEN_PROGRAM_ID,
     }),
     createInitializeMintInstruction(
       mintPubkey,
       input.decimals,
-      payer,   // mint authority = creator
-      payer    // freeze authority = creator
+      payer, // mint authority = creator
+      payer  // freeze authority = creator
     )
   );
 
-  // Must be partially signed by ephemeral keypair first
   mintTx.partialSign(mintKeypair);
-  const signedMintTx  = await wallet.signTransaction(mintTx);
-  const mintSignature  = await connection.sendRawTransaction(signedMintTx.serialize());
-  await connection.confirmTransaction({ signature: mintSignature, blockhash: bh2, lastValidBlockHeight: lv2 });
+  const signedMintTx = await wallet.signTransaction(mintTx);
+  const mintSignature = await connection.sendRawTransaction(signedMintTx.serialize());
+  await connection.confirmTransaction({ signature: mintSignature, blockhash: bh2, lastValidBlockHeight: lv2 }, "confirmed");
 
-  // ── 4. TX 3: Create ATA + mint supply ─────────────────────────
+  // ── 4. TX 3: Create ATA + mint supply ───────────────────────
   const ata = await getAssociatedTokenAddress(mintPubkey, payer);
 
   const { blockhash: bh3, lastValidBlockHeight: lv3 } = await connection.getLatestBlockhash();
   const supplyTx = new Transaction({ recentBlockhash: bh3, feePayer: payer });
 
-  // Create Associated Token Account
   supplyTx.add(
     createAssociatedTokenAccountInstruction(payer, ata, payer, mintPubkey)
   );
 
-  // Mint total supply to creator
   const supplyRaw = BigInt(input.initialSupply) * BigInt(10 ** input.decimals);
   supplyTx.add(
     createMintToInstruction(mintPubkey, ata, payer, supplyRaw)
   );
 
-  const signedSupplyTx = await wallet.signTransaction(supplyTx);
-  await connection.sendRawTransaction(signedSupplyTx.serialize());
-  await connection.confirmTransaction({ signature: mintSignature, blockhash: bh3, lastValidBlockHeight: lv3 });
+  const signedSupplyTx   = await wallet.signTransaction(supplyTx);
+  // ✅ FIX: captura a assinatura da TX3 e confirma com ela (não com mintSignature da TX2)
+  const supplySignature  = await connection.sendRawTransaction(signedSupplyTx.serialize());
+  await connection.confirmTransaction({ signature: supplySignature, blockhash: bh3, lastValidBlockHeight: lv3 }, "confirmed");
 
   return {
     mintAddress:    mintPubkey.toBase58(),
