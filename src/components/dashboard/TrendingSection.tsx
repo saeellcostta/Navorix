@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { Flame, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
+import type { TokenListItem } from "@/types/token";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatMarketCap(value: number): string {
@@ -14,29 +15,48 @@ function formatMarketCap(value: number): string {
 }
 
 // ─── Card do carrossel ────────────────────────────────────────────────────────
-function TrendingCard({ token, rank }: { token: any; rank: number }) {
-  const isPositive = (token.priceChange24h ?? token.price_change_24h ?? 0) >= 0;
-  const change = Math.abs(token.priceChange24h ?? token.price_change_24h ?? 0);
-  const marketCap = token.marketCapUsd ?? token.market_cap_usd ?? 0;
-  const image = token.imageUrl ?? token.image_url ?? "";
-  const banner = token.bannerUrl ?? token.banner_url ?? image;
-  const symbol = token.symbol ?? "";
-  const name = token.name ?? "";
-  const description = token.description ?? "";
-  const mint = token.mintAddress ?? token.mint ?? "";
+function TrendingCard({ token, rank }: { token: TokenListItem; rank: number }) {
+  const change = token.stats?.priceChange24h ?? 0;
+  const isPositive = change >= 0;
+  const marketCap = token.stats?.marketCap ?? 0;
+
+  const hasBanner = !!token.bannerUrl;
+  const hasLogo   = !!token.imageUrl;
 
   return (
-    <Link href={`/token/${mint}`} style={{ textDecoration: "none" }}>
+    <Link href={`/token/${token.mintAddress}`} style={{ textDecoration: "none" }}>
       <div className="tc-card">
-        {/* Banner */}
+
+        {/* ── Banner ── */}
         <div className="tc-banner">
-          {banner ? (
-            <img src={banner} alt={name} className="tc-banner-img" />
+
+          {hasBanner ? (
+            /* Token tem banner real → exibe normalmente */
+            <img src={token.bannerUrl} alt={token.name} className="tc-banner-img" />
+          ) : hasLogo ? (
+            /* Sem banner mas tem logo → logo esticada com blur como fundo */
+            <>
+              {/* Camada de fundo: logo esticada + blur */}
+              <img
+                src={token.imageUrl}
+                alt=""
+                aria-hidden
+                className="tc-banner-blur-bg"
+              />
+              {/* Logo centralizada por cima */}
+              <img
+                src={token.imageUrl}
+                alt={token.name}
+                className="tc-banner-logo-center"
+              />
+            </>
           ) : (
+            /* Sem imagem nenhuma → placeholder com símbolo */
             <div className="tc-banner-placeholder">
-              <span className="tc-symbol-ghost">${symbol}</span>
+              <span className="tc-symbol-ghost">${token.symbol}</span>
             </div>
           )}
+
           <div className="tc-overlay" />
 
           {/* Rank badge */}
@@ -49,29 +69,30 @@ function TrendingCard({ token, rank }: { token: any; rank: number }) {
           <div className="tc-footer">
             <span className="tc-mcap">{formatMarketCap(marketCap)}</span>
             <span className={`tc-change ${isPositive ? "tc-up" : "tc-down"}`}>
-              {isPositive ? "↑" : "↓"}{change.toFixed(1)}%
+              {isPositive ? "↑" : "↓"}{Math.abs(change).toFixed(1)}%
             </span>
           </div>
         </div>
 
-        {/* Info */}
+        {/* ── Info ── */}
         <div className="tc-info">
           <div className="tc-avatar">
-            {image ? (
-              <img src={image} alt={symbol} className="tc-avatar-img" />
+            {hasLogo ? (
+              <img src={token.imageUrl} alt={token.symbol} className="tc-avatar-img" />
             ) : (
-              <div className="tc-avatar-fallback">{symbol.slice(0, 2)}</div>
+              <div className="tc-avatar-fallback">{token.symbol.slice(0, 2)}</div>
             )}
           </div>
           <div className="tc-meta">
-            <p className="tc-name">{name}</p>
+            <p className="tc-name">{token.name}</p>
             <p className="tc-desc">
-              {description
-                ? description.slice(0, 55) + (description.length > 55 ? "…" : "")
-                : `$${symbol} on Solana`}
+              {token.description
+                ? token.description.slice(0, 55) + (token.description.length > 55 ? "…" : "")
+                : `$${token.symbol} on Solana`}
             </p>
           </div>
         </div>
+
       </div>
     </Link>
   );
@@ -122,7 +143,6 @@ export function TrendingSection() {
   return (
     <>
       <style>{`
-        /* ── Card ── */
         .tc-card {
           flex: 0 0 210px;
           scroll-snap-align: start;
@@ -139,20 +159,53 @@ export function TrendingSection() {
           box-shadow: 0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(251,191,36,0.1);
         }
 
-        /* ── Banner ── */
+        /* ── Banner container ── */
         .tc-banner {
           position: relative;
-          width: 100%;
-          height: 144px;
+          width: 100%; height: 144px;
           overflow: hidden;
           background: #13132a;
         }
+
+        /* Banner real (token tem banner_url) */
         .tc-banner-img {
           width: 100%; height: 100%;
           object-fit: cover;
           transition: transform 0.35s ease;
         }
         .tc-card:hover .tc-banner-img { transform: scale(1.07); }
+
+        /* Logo esticada com blur como fundo */
+        .tc-banner-blur-bg {
+          position: absolute;
+          inset: -10px;
+          width: calc(100% + 20px);
+          height: calc(100% + 20px);
+          object-fit: cover;
+          filter: blur(18px) brightness(0.45) saturate(1.4);
+          transform: scale(1.05);
+          transition: transform 0.35s ease;
+        }
+        .tc-card:hover .tc-banner-blur-bg { transform: scale(1.12); }
+
+        /* Logo centralizada por cima do blur */
+        .tc-banner-logo-center {
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 72px; height: 72px;
+          object-fit: cover;
+          border-radius: 50%;
+          border: 2px solid rgba(255,255,255,0.12);
+          box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+          transition: transform 0.35s ease;
+          z-index: 1;
+        }
+        .tc-card:hover .tc-banner-logo-center {
+          transform: translate(-50%, -50%) scale(1.08);
+        }
+
+        /* Placeholder sem imagem */
         .tc-banner-placeholder {
           width: 100%; height: 100%;
           display: flex; align-items: center; justify-content: center;
@@ -162,12 +215,16 @@ export function TrendingSection() {
           font-size: 2rem; font-weight: 800;
           color: rgba(251,191,36,0.12); letter-spacing: -0.04em;
         }
+
+        /* Overlay gradiente (em cima de tudo) */
         .tc-overlay {
-          position: absolute; inset: 0;
-          background: linear-gradient(to bottom, transparent 25%, rgba(8,8,15,0.88) 100%);
+          position: absolute; inset: 0; z-index: 2;
+          background: linear-gradient(to bottom, transparent 20%, rgba(8,8,15,0.75) 100%);
         }
+
+        /* Rank badge */
         .tc-rank {
-          position: absolute; top: 0.5rem; left: 0.5rem;
+          position: absolute; top: 0.5rem; left: 0.5rem; z-index: 3;
           display: flex; align-items: center; gap: 0.2rem;
           font-size: 0.6875rem; font-weight: 700; color: #fbbf24;
           background: rgba(8,8,15,0.72);
@@ -176,9 +233,12 @@ export function TrendingSection() {
           border-radius: 999px; padding: 0.2rem 0.5rem;
         }
         .tc-rank-fire { color: #fb923c; }
+
+        /* Market cap + variação */
         .tc-footer {
           position: absolute; bottom: 0.6rem; left: 0.6rem; right: 0.6rem;
           display: flex; align-items: flex-end; justify-content: space-between;
+          z-index: 3;
         }
         .tc-mcap {
           font-size: 1.05rem; font-weight: 800; color: #f9fafb;
@@ -188,12 +248,13 @@ export function TrendingSection() {
           font-size: 0.6875rem; font-weight: 700;
           border-radius: 999px; padding: 0.15rem 0.45rem;
         }
-        .tc-up   { background: rgba(34,197,94,0.18); color: #4ade80; border: 1px solid rgba(34,197,94,0.22); }
-        .tc-down { background: rgba(239,68,68,0.18);  color: #f87171; border: 1px solid rgba(239,68,68,0.22); }
+        .tc-up   { background: rgba(34,197,94,0.18);  color: #4ade80; border: 1px solid rgba(34,197,94,0.22); }
+        .tc-down { background: rgba(239,68,68,0.18);   color: #f87171; border: 1px solid rgba(239,68,68,0.22); }
 
-        /* ── Info ── */
+        /* Info inferior */
         .tc-info {
-          display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.7rem;
+          display: flex; align-items: flex-start;
+          gap: 0.6rem; padding: 0.7rem;
         }
         .tc-avatar {
           flex-shrink: 0; width: 1.875rem; height: 1.875rem;
@@ -219,17 +280,16 @@ export function TrendingSection() {
           -webkit-box-orient: vertical; overflow: hidden;
         }
 
-        /* ── Scroll ── */
+        /* Scroll container */
         .tc-scroll {
           display: flex; gap: 0.875rem;
           overflow-x: auto; scroll-snap-type: x mandatory;
           -webkit-overflow-scrolling: touch;
-          padding-bottom: 0.5rem;
-          scrollbar-width: none;
+          padding-bottom: 0.5rem; scrollbar-width: none;
         }
         .tc-scroll::-webkit-scrollbar { display: none; }
 
-        /* ── Skeleton ── */
+        /* Skeleton */
         .tc-skeleton { pointer-events: none; }
         @keyframes tcShimmer {
           0%   { background-position: 200% 0; }
@@ -237,13 +297,12 @@ export function TrendingSection() {
         }
         .tc-sk-banner {
           background: linear-gradient(90deg, #0d0d1a 25%, #1c1c38 50%, #0d0d1a 75%);
-          background-size: 200% 100%;
-          animation: tcShimmer 1.5s infinite;
+          background-size: 200% 100%; animation: tcShimmer 1.5s infinite;
         }
         .tc-sk-avatar {
           flex-shrink: 0; width: 1.875rem; height: 1.875rem; border-radius: 50%;
-          background: #1c1c38; animation: tcShimmer 1.5s infinite;
-          background-size: 200% 100%;
+          background: linear-gradient(90deg, #0d0d1a 25%, #1c1c38 50%, #0d0d1a 75%);
+          background-size: 200% 100%; animation: tcShimmer 1.5s infinite;
         }
         .tc-sk-lines { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; padding-top: 0.25rem; }
         .tc-sk-line {
@@ -252,7 +311,7 @@ export function TrendingSection() {
           background-size: 200% 100%; animation: tcShimmer 1.5s infinite;
         }
 
-        /* ── Arrow button ── */
+        /* Setas */
         .tc-arrow {
           display: flex; align-items: center; justify-content: center;
           width: 2rem; height: 2rem; border-radius: 50%;
@@ -266,7 +325,7 @@ export function TrendingSection() {
         }
         .tc-arrow:disabled { opacity: 0.3; cursor: default; }
 
-        /* ── Empty ── */
+        /* Vazio */
         .tc-empty {
           width: 100%; height: 180px;
           display: flex; align-items: center; justify-content: center;
@@ -311,7 +370,7 @@ export function TrendingSection() {
                 : tokens.length === 0
                   ? <div className="tc-empty">Nenhum token em destaque ainda.</div>
                   : tokens.map((token, i) => (
-                      <TrendingCard key={token.mintAddress ?? i} token={token} rank={i + 1} />
+                      <TrendingCard key={token.mintAddress} token={token} rank={i + 1} />
                     ))
               }
             </div>
