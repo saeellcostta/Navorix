@@ -20,53 +20,42 @@ function rowToTokenListItem(
   row: TokenRow & { token_stats?: TokenStatsRow | null },
   rank?: number
 ): TokenListItem {
-  const r   = row as Record<string, unknown>;
-  const now = Date.now();
+  const stats = row.token_stats ?? null;
+  const now   = Date.now();
   const createdMs = new Date(row.created_at).getTime();
   const isNew = now - createdMs < 24 * 60 * 60 * 1000;
-
-  // Suporte a duas formas:
-  // 1. row com token_stats joinado (tabela tokens + join)
-  // 2. row achatado da view tokens_trending (campos direto na row)
-  const stats = row.token_stats ?? null;
-
-  const price          = stats ? Number(stats.price_usd)         : Number(r.price_usd         ?? 0);
-  const priceChange24h = stats ? Number(stats.price_change_24h)  : Number(r.price_change_24h  ?? 0);
-  const marketCap      = stats ? Number(stats.market_cap_usd)    : Number(r.market_cap_usd    ?? 0);
-  const volume24h      = stats ? Number(stats.volume_24h_usd)    : Number(r.volume_24h_usd    ?? 0);
-  const holders        = stats ? stats.holders                   : Number(r.holders            ?? 0);
-  const liquidity      = stats ? Number(stats.liquidity_usd)     : Number(r.liquidity_usd     ?? 0);
-  const txCount24h     = stats ? stats.tx_count_24h              : Number(r.tx_count_24h       ?? 0);
 
   return {
     mintAddress:  row.mint_address,
     name:         row.name,
     symbol:       row.symbol,
     description:  row.description ?? "",
-    imageUrl:     (r.image_url  as string) ?? "",
-    bannerUrl:    (r.banner_url as string) ?? "",
+    imageUrl:     row.image_url ?? "",
+    bannerUrl:    (row as Record<string, unknown>).banner_url as string ?? "",
     decimals:     row.decimals,
     supply:       Number(row.initial_supply),
     creator:      row.creator_wallet,
     createdAt:    new Date(row.created_at),
     social: {
-      twitter:  (r.twitter_url  as string) ?? "",
-      telegram: (r.telegram_url as string) ?? "",
-      website:  (r.website_url  as string) ?? "",
-      discord:  (r.discord_url  as string) ?? "",
+      twitter:  (row as Record<string, unknown>).twitter_url  as string ?? "",
+      telegram: (row as Record<string, unknown>).telegram_url as string ?? "",
+      website:  (row as Record<string, unknown>).website_url  as string ?? "",
+      discord:  (row as Record<string, unknown>).discord_url  as string ?? "",
     },
     rank,
     isNew,
-    isTrending: rank !== undefined && rank <= 10,
-    stats: {
-      price,
-      priceChange24h,
-      marketCap,
-      volume24h,
-      holders,
-      liquidity,
-      txCount24h,
-    },
+    isTrending:   rank !== undefined && rank <= 10,
+    stats: stats
+      ? {
+          price:          Number(stats.price_usd),
+          priceChange24h: Number(stats.price_change_24h),
+          marketCap:      Number(stats.market_cap_usd),
+          volume24h:      Number(stats.volume_24h_usd),
+          holders:        stats.holders,
+          liquidity:      Number(stats.liquidity_usd),
+          txCount24h:     stats.tx_count_24h,
+        }
+      : undefined,
   };
 }
 
@@ -79,6 +68,9 @@ function rowToToken(row: TokenRow & { token_stats?: TokenStatsRow | null }): Tok
 //  READ
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Fetch a paginated list of tokens, with stats joined.
+ */
 export async function getTokens(opts: {
   sort?: SortOption;
   limit?: number;
@@ -87,7 +79,14 @@ export async function getTokens(opts: {
   const { sort = "trending", limit = 20, offset = 0 } = opts;
   const db = createAdminClient();
 
-  // View achatada para trending
+  const sortColumnMap: Record<SortOption, string> = {
+    trending:  "token_stats.volume_24h_usd", // approximation; real trending uses view
+    new:       "created_at",
+    marketcap: "token_stats.market_cap_usd",
+    volume:    "token_stats.volume_24h_usd",
+  };
+
+  // Use the tokens_trending view for trending sort (real 24h volume score)
   if (sort === "trending") {
     const { data, error } = await db
       .from("tokens_trending")
@@ -104,13 +103,18 @@ export async function getTokens(opts: {
     );
   }
 
-  const ascending = false;
-  const { data, error } = await db
+  let query = db
     .from("tokens")
     .select("*, token_stats(*)")
-    .order("created_at", { ascending })
     .range(offset, offset + limit - 1);
 
+  if (sort === "new") {
+    query = query.order("created_at", { ascending: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(`getTokens: ${error.message}`);
 
   return (data ?? []).map((row, i) =>
@@ -121,6 +125,9 @@ export async function getTokens(opts: {
   );
 }
 
+/**
+ * Fetch a single token by mint address.
+ */
 export async function getTokenByMint(mintAddress: string): Promise<Token | null> {
   const db = createAdminClient();
   const { data, error } = await db
@@ -130,7 +137,7 @@ export async function getTokenByMint(mintAddress: string): Promise<Token | null>
     .single();
 
   if (error) {
-    if (error.code === "PGRST116") return null;
+    if (error.code === "PGRST116") return null; // not found
     throw new Error(`getTokenByMint: ${error.message}`);
   }
 
@@ -141,6 +148,9 @@ export async function getTokenByMint(mintAddress: string): Promise<Token | null>
 //  WRITE
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Insert a newly created token (called after on-chain confirmation).
+ */
 export async function insertToken(input: TokenInsert): Promise<Token> {
   const db = createAdminClient();
   const { data, error } = await db
@@ -151,6 +161,7 @@ export async function insertToken(input: TokenInsert): Promise<Token> {
 
   if (error) throw new Error(`insertToken: ${error.message}`);
 
+  // Bootstrap empty stats row
   await db.from("token_stats").upsert(
     { mint_address: input.mint_address } satisfies StatsInsert,
     { onConflict: "mint_address" }
@@ -159,6 +170,9 @@ export async function insertToken(input: TokenInsert): Promise<Token> {
   return rowToToken(data as TokenRow & { token_stats: TokenStatsRow | null });
 }
 
+/**
+ * Upsert live token stats (called by the off-chain indexer / cron job).
+ */
 export async function upsertTokenStats(stats: StatsInsert): Promise<void> {
   const db = createAdminClient();
   const { error } = await db
@@ -168,6 +182,9 @@ export async function upsertTokenStats(stats: StatsInsert): Promise<void> {
   if (error) throw new Error(`upsertTokenStats: ${error.message}`);
 }
 
+/**
+ * Upsert or create a user record by wallet address.
+ */
 export async function upsertUser(walletAddress: string): Promise<void> {
   const db = createAdminClient();
   const { error } = await db
