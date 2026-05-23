@@ -94,7 +94,7 @@ const SHOW_WALLETS = [
 ];
 
 export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
-  const { wallets, select, connecting, disconnect, connected } = useWallet();
+  const { wallets, select, connect, connecting, disconnect, connected } = useWallet();
   const [isMobile, setIsMobile] = useState(false);
   const [isPhantomBrowser, setIsPhantomBrowser] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<{ name: string; meta: WalletMeta } | null>(null);
@@ -115,7 +115,6 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  // Reset selected wallet when modal closes
   useEffect(() => {
     if (!open) setSelectedWallet(null);
   }, [open]);
@@ -144,14 +143,18 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
       try { await disconnect(); } catch { /* ignore */ }
     }
 
-    // Carteira instalada ou WalletConnect → conecta direto
+    // Carteira instalada ou WalletConnect → select + connect
     if (isInstalled || isWC || isPhantomBrowser) {
       select(walletName as Parameters<typeof select>[0]);
       onClose();
+      // Chama connect() após o select() ser processado
+      setTimeout(() => {
+        connect().catch(() => {});
+      }, 150);
       return;
     }
 
-    // Mobile sem carteira instalada → mostra opções (abrir app ou instalar)
+    // Mobile sem carteira instalada → mostra opções
     if (isMobile && meta) {
       setSelectedWallet({ name: walletName, meta });
       return;
@@ -245,7 +248,6 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
             <p className="text-center text-sm text-[var(--text-secondary)]">
               Como você quer conectar com <span className="font-bold text-[var(--text-primary)]">{meta.label ?? name}</span>?
             </p>
-
             {meta.mobileDeepLink && (
               <button
                 onClick={() => { window.location.href = meta.mobileDeepLink!; onClose(); }}
@@ -258,7 +260,6 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
                 </div>
               </button>
             )}
-
             <button
               onClick={() => { window.open(meta.installUrl, "_blank", "noopener"); onClose(); }}
               className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-3)] px-4 py-3 cursor-pointer"
