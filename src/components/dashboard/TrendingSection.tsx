@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { Flame, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
-import type { TokenListItem } from "@/types/token";
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatMarketCap(value: number): string {
@@ -15,7 +15,7 @@ function formatMarketCap(value: number): string {
 }
 
 // ─── Card do carrossel ────────────────────────────────────────────────────────
-function TrendingCard({ token, rank }: { token: TokenListItem; rank: number }) {
+function TrendingCard({ token, rank }: { token: any; rank: number }) {
   const change = token.stats?.priceChange24h ?? 0;
   const isPositive = change >= 0;
   const marketCap = token.stats?.marketCap ?? 0;
