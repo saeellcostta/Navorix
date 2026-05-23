@@ -46,16 +46,18 @@ const WALLET_META: Record<string, WalletMeta> = {
     installUrl:     "https://www.coinbase.com/wallet/downloads",
     mobileDeepLink: `https://go.cb-w.com/dapp?cb_url=${enc(SITE_URL)}`,
   },
+  // Adapter name é "Trust" — coin_id=501 = Solana
   "Trust Wallet": {
     icon:           "https://trustwallet.com/assets/images/favicon.png",
     installUrl:     "https://trustwallet.com/download",
-    // coin_id=501 = Solana
     mobileDeepLink: `https://link.trustwallet.com/open_url?coin_id=501&url=${enc(SITE_URL)}`,
+    label:          "Trust Wallet",
   },
   Trust: {
     icon:           "https://trustwallet.com/assets/images/favicon.png",
     installUrl:     "https://trustwallet.com/download",
     mobileDeepLink: `https://link.trustwallet.com/open_url?coin_id=501&url=${enc(SITE_URL)}`,
+    label:          "Trust Wallet",
   },
   "Bitget Wallet": {
     icon:           "https://web3.bitget.com/favicon.ico",
@@ -80,7 +82,7 @@ const SHOW_WALLETS = [
   "Solflare",
   "Backpack",
   "Coinbase Wallet",
-  "Trust Wallet",
+  "Trust",          // adapter name é "Trust"
   "Bitget Wallet",
   "Ledger",
 ];

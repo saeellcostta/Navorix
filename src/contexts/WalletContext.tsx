@@ -50,24 +50,35 @@ function detectInjectedWallet(): string | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const w = window as any;
 
-  if (w.phantom?.solana)   return "Phantom";
-  if (w.solflare)          return "Solflare";
-  if (w.trustwallet)       return "Trust Wallet";
-  if (w.bitkeep?.solana)   return "Bitget Wallet";
-  if (w.backpack)          return "Backpack";
-  if (w.coinbaseSolana)    return "Coinbase Wallet";
+  // Phantom
+  if (w.phantom?.solana || w.solana?.isPhantom) return "Phantom";
 
-  // Fallback: verifica pelo userAgent
+  // Solflare
+  if (w.solflare || w.solana?.isSolflare) return "Solflare";
+
+  // Trust Wallet — adapter name é "Trust", injeta window.trustwallet ou window.solana.isTrust
+  if (w.trustwallet || w.trust || w.solana?.isTrust) return "Trust";
+
+  // Backpack
+  if (w.backpack || w.xnft) return "Backpack";
+
+  // Bitget (antes chamado BitKeep)
+  if (w.bitkeep?.solana || w.solana?.isBitKeep) return "Bitget Wallet";
+
+  // Coinbase
+  if (w.coinbaseSolana || w.solana?.isCoinbaseWallet) return "Coinbase Wallet";
+
+  // Fallback por userAgent
   const ua = navigator.userAgent;
-  if (ua.includes("Phantom"))   return "Phantom";
-  if (ua.includes("Solflare"))  return "Solflare";
-  if (ua.includes("Trust"))     return "Trust Wallet";
+  if (ua.includes("Phantom"))  return "Phantom";
+  if (ua.includes("Solflare")) return "Solflare";
+  if (ua.includes("Trust"))    return "Trust";
 
   return null;
 }
 
 function NavorixWalletContextBridge({ children }: { children: React.ReactNode }) {
-  const { publicKey, connected, connecting, disconnect, select, wallets } = useWallet();
+  const { publicKey, connected, connecting, disconnect, select, connect, wallets } = useWallet();
   const upsertedRef    = useRef<string | null>(null);
   const autoSelected   = useRef(false);
 
@@ -93,8 +104,14 @@ function NavorixWalletContextBridge({ children }: { children: React.ReactNode })
     if (match && (match.readyState === "Installed" || match.readyState === "Loadable")) {
       autoSelected.current = true;
       select(match.adapter.name);
+      // Aguarda o select processar e então chama connect para abrir o popup de aprovação
+      setTimeout(() => {
+        connect().catch(() => {
+          // Ignora se falhar — usuário pode conectar manualmente
+        });
+      }, 300);
     }
-  }, [connected, connecting, wallets, select]);
+  }, [connected, connecting, wallets, select, connect]);
 
   // Upsert user record in DB whenever a new wallet connects
   useEffect(() => {
