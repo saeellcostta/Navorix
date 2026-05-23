@@ -6,6 +6,7 @@ import "./globals.css";
 import { WalletContextProvider } from "@/contexts/WalletContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from "@/config/site";
 
 const geistSans = Geist({
@@ -75,17 +76,52 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
+      {/* Script que roda ANTES do React — limpa estado corrompido da carteira */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              // Remove parâmetros de erro do Phantom da URL
+              var url = new URL(window.location.href);
+              if (url.searchParams.has('errorCode') || url.searchParams.has('errorMessage')) {
+                url.searchParams.delete('errorCode');
+                url.searchParams.delete('errorMessage');
+                window.history.replaceState({}, '', url.pathname + (url.search || ''));
+              }
+              // Limpa estado corrompido do wallet-adapter no localStorage
+              var keysToRemove = [];
+              for (var i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (key && (
+                  key === 'walletName' ||
+                  key.startsWith('wallet-') ||
+                  key.startsWith('phantom') ||
+                  key.startsWith('solflare') ||
+                  key.startsWith('backpack')
+                )) {
+                  keysToRemove.push(key);
+                }
+              }
+              // Só limpa se há errorCode na URL (estado corrompido)
+              if (window.location.search.includes('errorCode')) {
+                keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+              }
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
       <body className="min-h-dvh flex flex-col bg-[var(--background)] text-[var(--foreground)] antialiased">
-        <WalletContextProvider>
-          <Navbar />
+        <ErrorBoundary>
+          <WalletContextProvider>
+            <Navbar />
 
-          <main className="flex-1 pt-16">
-            {children}
-          </main>
+            <main className="flex-1 pt-16">
+              {children}
+            </main>
 
-          <Footer />
+            <Footer />
 
-          <Toaster
+            <Toaster
             theme="dark"
             position="bottom-right"
             toastOptions={{
@@ -96,7 +132,8 @@ export default function RootLayout({
               },
             }}
           />
-        </WalletContextProvider>
+          </WalletContextProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
