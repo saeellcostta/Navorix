@@ -99,7 +99,7 @@ const SHOW_WALLETS = [
 ];
 
 export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
-  const { wallets, select, connecting } = useWallet();
+  const { wallets, select, connecting, disconnect, connected } = useWallet();
   const [isMobile, setIsMobile] = useState(false);
   const [isPhantomBrowser, setIsPhantomBrowser] = useState(false);
 
@@ -137,25 +137,29 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
   const installed    = allWallets.filter(w => w.readyState === "Installed" || w.readyState === "Loadable");
   const notInstalled = allWallets.filter(w => w.readyState !== "Installed" && w.readyState !== "Loadable");
 
-  const handleSelect = (walletName: string, readyState: string) => {
+  const handleSelect = async (walletName: string, readyState: string) => {
     const meta = WALLET_META[walletName] ?? Object.values(WALLET_META)[0];
     const isInstalled = readyState === "Installed" || readyState === "Loadable";
 
+    // Se outra carteira está conectada, desconecta primeiro
+    if (connected) {
+      try { await disconnect(); } catch { /* ignore */ }
+    }
+
     if (isMobile && !isPhantomBrowser && meta?.mobileDeepLink) {
-      // Mobile com deep link → abre o app da carteira
       window.location.href = meta.mobileDeepLink;
       onClose();
       return;
     }
 
-    if (!isInstalled && !isMobile) {
+    if (!isInstalled && walletName !== "WalletConnect" && !isMobile) {
       // Desktop sem extensão → abre página de instalação
       window.open(meta?.installUrl, "_blank", "noopener");
       onClose();
       return;
     }
 
-    // Instalado → conecta via adapter
+    // WalletConnect ou carteira instalada → conecta via adapter
     select(walletName as Parameters<typeof select>[0]);
     onClose();
   };

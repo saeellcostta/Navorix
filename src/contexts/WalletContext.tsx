@@ -91,10 +91,25 @@ function NavorixWalletContextBridge({ children }: { children: React.ReactNode })
     return `${publicKeyStr.slice(0, 4)}...${publicKeyStr.slice(-4)}`;
   }, [publicKeyStr]);
 
-  // Auto-seleciona a carteira quando o site abre dentro de um wallet browser
+  // Auto-seleciona a carteira APENAS quando o site abre dentro do browser
+  // de uma carteira mobile (Phantom, Solflare, Trust, etc.)
+  // No desktop com extensão instalada NÃO faz auto-connect — usuário escolhe.
   useEffect(() => {
     if (connected || connecting || autoSelected.current) return;
     if (wallets.length === 0) return;
+
+    // Só auto-conecta se estiver DENTRO do browser de uma carteira
+    // (detectado pelo userAgent do próprio app)
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const isInsideWalletBrowser =
+      ua.includes("Phantom") ||
+      ua.includes("Solflare") ||
+      ua.includes("Trust") ||
+      ua.includes("BitKeep") ||
+      ua.includes("Bitget") ||
+      ua.includes("Backpack");
+
+    if (!isInsideWalletBrowser) return;
 
     const detected = detectInjectedWallet();
     if (!detected) return;
@@ -107,11 +122,8 @@ function NavorixWalletContextBridge({ children }: { children: React.ReactNode })
     if (match && (match.readyState === "Installed" || match.readyState === "Loadable")) {
       autoSelected.current = true;
       select(match.adapter.name);
-      // Aguarda o select processar e então chama connect para abrir o popup de aprovação
       setTimeout(() => {
-        connect().catch(() => {
-          // Ignora se falhar — usuário pode conectar manualmente
-        });
+        connect().catch(() => {});
       }, 300);
     }
   }, [connected, connecting, wallets, select, connect]);
