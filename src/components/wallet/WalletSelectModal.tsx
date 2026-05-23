@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { X, Download } from "lucide-react";
+import { X, Download, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SITE_URL } from "@/config/site";
 
@@ -29,7 +29,6 @@ const WALLET_META: Record<string, WalletMeta> = {
   Solflare: {
     icon:           "https://solflare.com/assets/logo.svg",
     installUrl:     "https://solflare.com/download",
-    // Solflare mobile universal link — opens site inside Solflare browser
     mobileDeepLink: `https://solflare.com/ul/v1/browse/${enc(SITE_URL)}?ref=${enc(SITE_URL)}`,
   },
   Backpack: {
@@ -46,7 +45,6 @@ const WALLET_META: Record<string, WalletMeta> = {
     installUrl:     "https://www.coinbase.com/wallet/downloads",
     mobileDeepLink: `https://go.cb-w.com/dapp?cb_url=${enc(SITE_URL)}`,
   },
-  // Adapter name é "Trust" — coin_id=501 = Solana
   "Trust Wallet": {
     icon:           "https://trustwallet.com/assets/images/favicon.png",
     installUrl:     "https://trustwallet.com/download",
@@ -62,7 +60,6 @@ const WALLET_META: Record<string, WalletMeta> = {
   "Bitget Wallet": {
     icon:           "https://web3.bitget.com/favicon.ico",
     installUrl:     "https://web3.bitget.com/en/wallet-download",
-    // Bitget: abre o site dentro do browser da carteira
     mobileDeepLink: `bitkeep://bkconnect?action=dapp&url=${enc(SITE_URL)}`,
     label:          "Bitget Wallet",
   },
@@ -79,14 +76,12 @@ const WALLET_META: Record<string, WalletMeta> = {
   },
 };
 
-// WalletConnect info
 const WALLETCONNECT_INFO: WalletMeta = {
   icon:        "https://avatars.githubusercontent.com/u/37784886",
   installUrl:  "https://walletconnect.com",
   label:       "WalletConnect (QR Code)",
 };
 
-// Carteiras exibidas
 const SHOW_WALLETS = [
   "Phantom",
   "Solflare",
@@ -102,6 +97,7 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
   const { wallets, select, connecting, disconnect, connected } = useWallet();
   const [isMobile, setIsMobile] = useState(false);
   const [isPhantomBrowser, setIsPhantomBrowser] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<{ name: string; meta: WalletMeta } | null>(null);
 
   useEffect(() => {
     setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
@@ -119,48 +115,52 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Reset selected wallet when modal closes
+  useEffect(() => {
+    if (!open) setSelectedWallet(null);
+  }, [open]);
+
   if (!open) return null;
 
-  // Filtra apenas as carteiras que queremos mostrar
   const visibleWallets = wallets.filter(w =>
     SHOW_WALLETS.some(name => w.adapter.name.includes(name) || name.includes(w.adapter.name))
   );
 
-  // Adiciona carteiras que podem não estar registradas mas queremos mostrar
   const shownNames = new Set(visibleWallets.map(w => w.adapter.name));
   const extraWallets = SHOW_WALLETS
     .filter(name => ![...shownNames].some(n => n.includes(name) || name.includes(n)))
     .map(name => ({ adapter: { name, icon: "" }, readyState: "NotDetected" as const }));
 
   const allWallets = [...visibleWallets, ...extraWallets];
-
   const installed    = allWallets.filter(w => w.readyState === "Installed" || w.readyState === "Loadable");
   const notInstalled = allWallets.filter(w => w.readyState !== "Installed" && w.readyState !== "Loadable");
 
   const handleSelect = async (walletName: string, readyState: string) => {
-    const meta = WALLET_META[walletName] ?? Object.values(WALLET_META)[0];
+    const meta = WALLET_META[walletName] ?? null;
     const isInstalled = readyState === "Installed" || readyState === "Loadable";
+    const isWC = walletName === "WalletConnect";
 
-    // Se outra carteira está conectada, desconecta primeiro
     if (connected) {
       try { await disconnect(); } catch { /* ignore */ }
     }
 
-    if (isMobile && !isPhantomBrowser && meta?.mobileDeepLink) {
-      window.location.href = meta.mobileDeepLink;
+    // Carteira instalada ou WalletConnect → conecta direto
+    if (isInstalled || isWC || isPhantomBrowser) {
+      select(walletName as Parameters<typeof select>[0]);
       onClose();
       return;
     }
 
-    if (!isInstalled && walletName !== "WalletConnect" && !isMobile) {
-      // Desktop sem extensão → abre página de instalação
-      window.open(meta?.installUrl, "_blank", "noopener");
-      onClose();
+    // Mobile sem carteira instalada → mostra opções (abrir app ou instalar)
+    if (isMobile && meta) {
+      setSelectedWallet({ name: walletName, meta });
       return;
     }
 
-    // WalletConnect ou carteira instalada → conecta via adapter
-    select(walletName as Parameters<typeof select>[0]);
+    // Desktop sem extensão → abre página de instalação
+    if (meta?.installUrl) {
+      window.open(meta.installUrl, "_blank", "noopener");
+    }
     onClose();
   };
 
@@ -168,9 +168,7 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
     const name = wallet.adapter.name;
     const meta = WALLET_META[name] ?? WALLET_META[name.split(" ")[0]] ?? null;
     const isWC = name === "WalletConnect";
-    const wcMeta = isWC ? WALLETCONNECT_INFO : null;
-    const icon = wallet.adapter.icon || meta?.icon || wcMeta?.icon || "";
-    const showMobileOpen = isMobile && !isPhantomBrowser && !!meta?.mobileDeepLink;
+    const icon = wallet.adapter.icon || meta?.icon || (isWC ? WALLETCONNECT_INFO.icon : "") || "";
 
     return (
       <button
@@ -185,58 +183,101 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
             : "border-transparent hover:bg-[var(--surface-3)] hover:border-[var(--border)]"
         )}
       >
-        {/* Ícone */}
         <div className="h-10 w-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shrink-0 border border-gray-100">
           {icon ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={icon}
-              alt={name}
-              className="h-8 w-8 object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
+            <img src={icon} alt={name} className="h-8 w-8 object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           ) : (
             <span className="text-base font-bold text-gray-800">{name.charAt(0)}</span>
           )}
         </div>
-
-        {/* Nome e status */}
         <div className="flex-1 text-left">
           <p className="text-sm font-semibold text-[var(--text-primary)]">
-            {meta?.label ?? name}
+            {meta?.label ?? (isWC ? WALLETCONNECT_INFO.label : name)}
           </p>
-          <p className={cn(
-            "text-[10px]",
-            isInstalled
-              ? "text-[var(--positive)]"
-              : showMobileOpen
-                ? "text-[var(--gold)]"
-                : "text-[var(--text-muted)]"
+          <p className={cn("text-[10px]",
+            isInstalled ? "text-[var(--positive)]" : "text-[var(--text-muted)]"
           )}>
-            {isInstalled
-              ? "Detectada ✓"
-              : showMobileOpen
-                ? "Toque para abrir o app"
-                : "Clique para instalar"}
+            {isInstalled ? "Detectada ✓" : isMobile ? "Toque para ver opções" : "Clique para instalar"}
           </p>
         </div>
-
-        {/* Indicador */}
         {isInstalled ? (
           <div className="h-2.5 w-2.5 rounded-full bg-[var(--positive)] shrink-0" />
-        ) : !showMobileOpen ? (
+        ) : (
           <Download className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
-        ) : null}
+        )}
       </button>
     );
   };
 
+  // Tela de opções para carteira não instalada no mobile
+  if (selectedWallet) {
+    const { name, meta } = selectedWallet;
+    const icon = WALLET_META[name]?.icon || "";
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+        <div className={cn(
+          "relative w-full z-10 sm:max-w-sm",
+          "rounded-t-2xl sm:rounded-2xl",
+          "border-t sm:border border-[var(--border-strong)]",
+          "bg-[var(--surface-2)] shadow-2xl shadow-black/60"
+        )}>
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="h-1 w-10 rounded-full bg-[var(--border-strong)]" />
+          </div>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+            <button onClick={() => setSelectedWallet(null)}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
+              ← Voltar
+            </button>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">{meta.label ?? name}</h2>
+            <button onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-3)] text-[var(--text-muted)] cursor-pointer">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="flex justify-center py-4">
+              {icon && <img src={icon} alt={name} className="h-16 w-16 rounded-2xl" />}
+            </div>
+            <p className="text-center text-sm text-[var(--text-secondary)]">
+              Como você quer conectar com <span className="font-bold text-[var(--text-primary)]">{meta.label ?? name}</span>?
+            </p>
+
+            {meta.mobileDeepLink && (
+              <button
+                onClick={() => { window.location.href = meta.mobileDeepLink!; onClose(); }}
+                className="flex w-full items-center gap-3 rounded-xl border border-[var(--gold)]/40 bg-[var(--gold-dim)] px-4 py-3 cursor-pointer"
+              >
+                <ExternalLink className="h-5 w-5 text-[var(--gold)] shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-bold text-[var(--gold)]">Abrir no app</p>
+                  <p className="text-xs text-[var(--text-muted)]">Abre o site dentro do {meta.label ?? name}</p>
+                </div>
+              </button>
+            )}
+
+            <button
+              onClick={() => { window.open(meta.installUrl, "_blank", "noopener"); onClose(); }}
+              className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-3)] px-4 py-3 cursor-pointer"
+            >
+              <Download className="h-5 w-5 text-[var(--text-muted)] shrink-0" />
+              <div className="text-left">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Instalar {meta.label ?? name}</p>
+                <p className="text-xs text-[var(--text-muted)]">Baixar o app gratuitamente</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-
       <div className={cn(
         "relative w-full z-10 sm:max-w-sm",
         "rounded-t-2xl sm:rounded-2xl",
@@ -245,12 +286,9 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
         "shadow-2xl shadow-black/60",
         "max-h-[85dvh] overflow-y-auto"
       )}>
-        {/* Handle mobile */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="h-1 w-10 rounded-full bg-[var(--border-strong)]" />
         </div>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">Conectar Carteira</h2>
@@ -260,16 +298,12 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
                 : "Escolha uma carteira Solana"}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-          >
+          <button onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         </div>
-
         <div className="p-4 space-y-3">
-          {/* Detectadas */}
           {installed.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 px-1">
@@ -280,8 +314,6 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
               </div>
             </div>
           )}
-
-          {/* Outras */}
           <div>
             {installed.length > 0 && (
               <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 px-1">
@@ -292,8 +324,6 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
               {notInstalled.map(w => <WalletRow key={w.adapter.name} wallet={w} isInstalled={false} />)}
             </div>
           </div>
-
-          {/* Segurança */}
           <p className="text-center text-[10px] text-[var(--text-muted)] px-2 pb-2 leading-relaxed">
             A Navorix nunca pede sua seed phrase ou chave privada.
           </p>
