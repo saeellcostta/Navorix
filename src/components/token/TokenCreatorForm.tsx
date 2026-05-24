@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Upload, AlertTriangle, CheckCircle, Zap, ExternalLink,
   Loader2, Share2, MessageCircle, Globe, Users, Image as ImageIcon,
+  Info, X,
 } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Button } from "@/components/ui/Button";
@@ -42,6 +43,82 @@ const CREATION_STEP_KEYS = [
   "creating_pool",
   "saving_to_db",
 ] as const;
+
+const DECIMALS_INFO = [
+  {
+    value: 0,
+    title: "0 — Token inteiro (sem fração)",
+    description: "O token só existe em números inteiros. Não dá para ter \"meio token\".",
+    ideal: "NFTs, vouchers, bilhetes, itens de jogo.",
+    examples: ["✅ 1 token, 100 tokens", "❌ 0.5 tokens, 1.5 tokens"],
+  },
+  {
+    value: 6,
+    title: "6 — Padrão Solana (como USDC)",
+    description: "A menor parte é 0.000001. Igual ao USDC e à maioria dos tokens Solana.",
+    ideal: "Meme coins, tokens de trading, stablecoins.",
+    examples: ["✅ 1 token = 1.000.000 unidades internas", "✅ 0.000001 é a menor fração possível"],
+    recommended: true,
+  },
+  {
+    value: 9,
+    title: "9 — Alta precisão (como SOL)",
+    description: "A menor parte é 0.000000001. Igual ao SOL (1 SOL = 1 bilhão de lamports).",
+    ideal: "Tokens com preço muito baixo onde precisão é importante.",
+    examples: ["✅ 0.000000001 é a menor fração possível"],
+  },
+];
+
+// ── Componente de popover de info ──────────────────────────────
+function DecimalsInfoPopover({ decimals }: { decimals: number }) {
+  const [open, setOpen] = useState(false);
+  const info = DECIMALS_INFO.find(d => d.value === decimals);
+
+  return (
+    <span className="relative inline-flex items-center ml-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--gold)] hover:bg-[var(--gold-dim)] transition-colors cursor-pointer"
+      >
+        <Info className="h-3 w-3" />
+      </button>
+
+      {open && info && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-6 z-50 w-72 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] shadow-2xl shadow-black/60 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-bold text-[var(--text-primary)]">{info.title}</p>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{info.description}</p>
+            <div className="rounded-lg bg-[var(--surface-3)] p-2.5 space-y-1">
+              {info.examples.map((ex, i) => (
+                <p key={i} className="text-xs font-mono text-[var(--text-secondary)]">{ex}</p>
+              ))}
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Ideal para</p>
+              <p className="text-xs text-[var(--text-secondary)]">{info.ideal}</p>
+            </div>
+            {info.recommended && (
+              <div className="flex items-center gap-1.5 rounded-lg bg-[var(--gold-dim)] border border-[var(--gold)]/20 px-2.5 py-1.5">
+                <span className="text-[var(--gold)] text-xs font-bold">⭐ Recomendado para meme coins</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
 
 export function TokenCreatorForm() {
   const { connected } = useWallet();
@@ -199,10 +276,7 @@ export function TokenCreatorForm() {
   // ── Formulário principal ─────────────────────────────────────
   return (
     <form onSubmit={handleSubmit}>
-      {/* Layout 2 colunas no desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 max-w-5xl mx-auto">
-
-        {/* Coluna esquerda — formulário */}
         <div className="space-y-5">
           {!connected && (
             <div className="flex items-start gap-3 rounded-xl border border-[var(--gold)]/30 bg-[var(--gold-dim)] p-4">
@@ -218,7 +292,6 @@ export function TokenCreatorForm() {
           <Card>
             <CardHeader><CardTitle>{t.create.mediaSection}</CardTitle></CardHeader>
             <CardBody className="space-y-4">
-              {/* Logo */}
               <div>
                 <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">{t.create.logoLabel} <span className="text-[var(--negative)] text-xs">*</span></p>
                 <div onClick={() => imageRef.current?.click()}
@@ -238,8 +311,6 @@ export function TokenCreatorForm() {
                   <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageChange(e, "image")} />
                 </div>
               </div>
-
-              {/* Banner */}
               <div>
                 <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   {t.create.bannerLabel} <span className="text-xs text-[var(--text-muted)]">({t.create.optional})</span>
@@ -282,34 +353,18 @@ export function TokenCreatorForm() {
           <Card>
             <CardHeader><CardTitle>{t.create.socialSection} <span className="text-xs font-normal text-[var(--text-muted)]">({t.create.optional})</span></CardTitle></CardHeader>
             <CardBody className="space-y-3">
-              <Input
-                label="Share2 / X"
-                placeholder="https://x.com/seutoken"
-                value={form.social.twitter ?? ""}
+              <Input label="Share2 / X" placeholder="https://x.com/seutoken" value={form.social.twitter ?? ""}
                 onChange={e => setForm(f => ({ ...f, social: { ...f.social, twitter: e.target.value } }))}
-                leftAdornment={<Share2 className="h-4 w-4" />}
-              />
-              <Input
-                label="Telegram"
-                placeholder="https://t.me/seutoken"
-                value={form.social.telegram ?? ""}
+                leftAdornment={<Share2 className="h-4 w-4" />} />
+              <Input label="Telegram" placeholder="https://t.me/seutoken" value={form.social.telegram ?? ""}
                 onChange={e => setForm(f => ({ ...f, social: { ...f.social, telegram: e.target.value } }))}
-                leftAdornment={<MessageCircle className="h-4 w-4" />}
-              />
-              <Input
-                label="Website"
-                placeholder="https://seutoken.com"
-                value={form.social.website ?? ""}
+                leftAdornment={<MessageCircle className="h-4 w-4" />} />
+              <Input label="Website" placeholder="https://seutoken.com" value={form.social.website ?? ""}
                 onChange={e => setForm(f => ({ ...f, social: { ...f.social, website: e.target.value } }))}
-                leftAdornment={<Globe className="h-4 w-4" />}
-              />
-              <Input
-                label="Discord"
-                placeholder="https://discord.gg/seutoken"
-                value={form.social.discord ?? ""}
+                leftAdornment={<Globe className="h-4 w-4" />} />
+              <Input label="Discord" placeholder="https://discord.gg/seutoken" value={form.social.discord ?? ""}
                 onChange={e => setForm(f => ({ ...f, social: { ...f.social, discord: e.target.value } }))}
-                leftAdornment={<Users className="h-4 w-4" />}
-              />
+                leftAdornment={<Users className="h-4 w-4" />} />
             </CardBody>
           </Card>
 
@@ -317,19 +372,21 @@ export function TokenCreatorForm() {
           <Card>
             <CardHeader><CardTitle>{t.create.paramsSection}</CardTitle></CardHeader>
             <CardBody className="space-y-4">
-              {/* Decimais */}
+
+              {/* Decimais com ícone de info */}
               <div>
-                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5 flex items-center">
                   {t.create.decimalsLabel}
                   <span className="ml-2 text-xs text-[var(--text-muted)] font-normal">
                     — {t.create.decimalsHint}
                   </span>
+                  <DecimalsInfoPopover decimals={form.decimals} />
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 0, label: "0",       hint: t.create.integerToken },
-                    { value: 6, label: "6",       hint: t.create.solanaDefault },
-                    { value: 9, label: "9",       hint: t.create.highPrecision },
+                    { value: 0, label: "0", hint: t.create.integerToken },
+                    { value: 6, label: "6", hint: t.create.solanaDefault },
+                    { value: 9, label: "9", hint: t.create.highPrecision },
                   ].map(({ value, label, hint }) => (
                     <button
                       key={value}
@@ -359,8 +416,8 @@ export function TokenCreatorForm() {
                 </p>
                 <div className="grid grid-cols-3 gap-2 mb-2">
                   {[
-                    { value: 1_000_000,       label: "1M" },
-                    { value: 1_000_000_000,   label: "1B" },
+                    { value: 1_000_000,         label: "1M" },
+                    { value: 1_000_000_000,     label: "1B" },
                     { value: 1_000_000_000_000, label: "1T" },
                   ].map(({ value, label }) => (
                     <button
@@ -396,7 +453,6 @@ export function TokenCreatorForm() {
             </CardBody>
           </Card>
 
-          {/* ── Compra inicial — ligada ao supply e decimais ── */}
           <InitialBuyPanel
             value={form.initialBuySol}
             onChange={sol => setForm(f => ({ ...f, initialBuySol: sol }))}
@@ -404,14 +460,12 @@ export function TokenCreatorForm() {
             supply={form.initialSupply}
           />
 
-          {/* ── Resumo de custo ── */}
           <LaunchCostSummary
             initialBuySol={form.initialBuySol}
             symbol={form.symbol || "TOKEN"}
             walletBalance={balance}
           />
 
-          {/* ── CTA ── */}
           {!connected ? (
             <ConnectWalletButton size="xl" className="w-full" />
           ) : (
@@ -429,7 +483,6 @@ export function TokenCreatorForm() {
           </p>
         </div>
 
-        {/* Coluna direita — preview (sticky no desktop) */}
         <div className="hidden lg:block">
           <TokenPreview
             form={form}
@@ -439,7 +492,6 @@ export function TokenCreatorForm() {
         </div>
       </div>
 
-      {/* Preview no mobile (abaixo do form) */}
       <div className="lg:hidden mt-6 max-w-xl mx-auto">
         <TokenPreview
           form={form}
