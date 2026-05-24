@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WalletButton } from "@/components/wallet/WalletButton";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { NAV_LINKS } from "@/config/site";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -28,7 +30,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export function Navbar() {
-  const pathname = usePathname();
+  const pathname  = usePathname();
+  const { t }     = useLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -87,7 +90,7 @@ export function Navbar() {
                   )}
                 >
                   {Icon && <Icon className="h-4 w-4" />}
-                  {label}
+                  {(t.nav as Record<string, string>)[href === "/" ? "dashboard" : href.replace("/", "")] ?? label}
                 </Link>
               );
             })}
@@ -103,6 +106,7 @@ export function Navbar() {
               </span>
             </div>
 
+            <LanguageSwitcher />
             <WalletButton />
 
             {/* Mobile hamburger */}

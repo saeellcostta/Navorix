@@ -8,6 +8,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { WalletBrowserBanner } from "@/components/wallet/WalletBrowserBanner";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from "@/config/site";
 
 const geistSans = Geist({
@@ -113,6 +114,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-dvh flex flex-col bg-[var(--background)] text-[var(--foreground)] antialiased">
         <ErrorBoundary>
+          <LanguageProvider>
           <WalletContextProvider>
             <Navbar />
 
@@ -135,6 +137,7 @@ export default function RootLayout({
             }}
           />
           </WalletContextProvider>
+          </LanguageProvider>
         </ErrorBoundary>
       </body>
     </html>

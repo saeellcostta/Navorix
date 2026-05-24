@@ -6,6 +6,7 @@ import { useNavorixWallet } from "@/contexts/WalletContext";
 import { useSolBalance } from "@/hooks/useSolBalance";
 import { clearPhantomUrlParams } from "@/lib/phantomMobile";
 import { WalletSelectModal } from "./WalletSelectModal";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
 function getAvatarUrl(address: string): string {
@@ -16,6 +17,7 @@ export function WalletButton() {
   const { connected, connecting, publicKeyStr, shortAddress, disconnectWallet } =
     useNavorixWallet();
   const { balance } = useSolBalance();
+  const { t } = useLanguage();
   const [open, setOpen]           = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied]       = useState(false);
@@ -45,7 +47,7 @@ export function WalletButton() {
             "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           )}
         >
-          {connecting ? "Conectando..." : "Conectar Carteira"}
+          {connecting ? t.wallet.connecting : t.wallet.connect}
         </button>
         <WalletSelectModal open={modalOpen} onClose={() => setModalOpen(false)} />
       </>
@@ -124,7 +126,7 @@ export function WalletButton() {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
             >
               {copied ? <Check className="h-4 w-4 text-[var(--positive)]" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copiado!" : "Copiar endereço"}
+              {copied ? t.wallet.copied : t.wallet.copyAddress}
             </button>
 
             <a
@@ -135,7 +137,7 @@ export function WalletButton() {
               onClick={() => setOpen(false)}
             >
               <ExternalLink className="h-4 w-4" />
-              Ver no Solscan
+              {t.wallet.viewOnSolscan}
             </a>
 
             <div className="my-1 border-t border-[var(--border)]" />
@@ -145,7 +147,7 @@ export function WalletButton() {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#ef4444] hover:bg-[rgba(239,68,68,0.08)] transition-colors cursor-pointer"
             >
               <LogOut className="h-4 w-4" />
-              Desconectar
+              {t.wallet.disconnect}
             </button>
           </div>
         </>

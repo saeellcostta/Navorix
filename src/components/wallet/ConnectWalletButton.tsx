@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Wallet } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletSelectModal } from "./WalletSelectModal";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
 interface ConnectWalletButtonProps {
@@ -18,6 +19,7 @@ export function ConnectWalletButton({
   label = "Conectar Carteira",
 }: ConnectWalletButtonProps) {
   const { connecting } = useWallet();
+  const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
 
   const sizeClasses = {
@@ -44,7 +46,7 @@ export function ConnectWalletButton({
         )}
       >
         <Wallet className="h-4 w-4" />
-        {connecting ? "Conectando..." : label}
+        {connecting ? t.wallet.connecting : (label === "Conectar Carteira" ? t.wallet.connect : label)}
       </button>
 
       <WalletSelectModal open={modalOpen} onClose={() => setModalOpen(false)} />

@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { X, Download, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SITE_URL } from "@/config/site";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface WalletSelectModalProps {
   open: boolean;
@@ -95,6 +96,7 @@ const SHOW_WALLETS = [
 
 export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
   const { wallets, select, connect, connecting, disconnect, connected } = useWallet();
+  const { t } = useLanguage();
   const [isMobile, setIsMobile] = useState(false);
   const [isPhantomBrowser, setIsPhantomBrowser] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<{ name: string; meta: WalletMeta } | null>(null);
@@ -198,7 +200,7 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
           <p className={cn("text-[10px]",
             isInstalled ? "text-[var(--positive)]" : "text-[var(--text-muted)]"
           )}>
-            {isInstalled ? "Detectada ✓" : isMobile ? "Toque para ver opções" : "Clique para instalar"}
+            {isInstalled ? `${t.wallet.detected} ✓` : isMobile ? t.wallet.openApp : t.wallet.installExtension}
           </p>
         </div>
         {isInstalled ? (
@@ -287,11 +289,11 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
         </div>
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)]">Conectar Carteira</h2>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">{t.wallet.chooseWallet}</h2>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {installed.length > 0
-                ? `${installed.length} carteira(s) detectada(s)`
-                : "Escolha uma carteira Solana"}
+                ? `${installed.length} ${t.wallet.detected.toLowerCase()}`
+                : t.wallet.chooseWallet}
             </p>
           </div>
           <button onClick={onClose}
@@ -303,7 +305,7 @@ export function WalletSelectModal({ open, onClose }: WalletSelectModalProps) {
           {installed.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 px-1">
-                Detectadas
+                {t.wallet.detected}
               </p>
               <div className="space-y-1">
                 {installed.map(w => <WalletRow key={w.adapter.name} wallet={w} isInstalled={true} />)}
