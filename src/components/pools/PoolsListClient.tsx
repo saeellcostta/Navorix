@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { PoolCard, PoolCardSkeleton } from "./PoolCard";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { LiquidityPool } from "@/types/pool";
 
 export function PoolsListClient() {
-  const [pools, setPools] = useState<LiquidityPool[]>([]);
+  const { t } = useLanguage();
+  const [pools, setPools]     = useState<LiquidityPool[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -17,13 +19,13 @@ export function PoolsListClient() {
         const data = await res.json();
         setPools(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load pools");
+        setError(err instanceof Error ? err.message : t.common.error);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [t.common.error]);
 
   if (error) {
     return (
@@ -38,10 +40,10 @@ export function PoolsListClient() {
       {loading
         ? Array.from({ length: 6 }).map((_, i) => <PoolCardSkeleton key={i} />)
         : pools.length > 0
-          ? pools.map((pool) => <PoolCard key={pool.id} pool={pool} />)
+          ? pools.map(pool => <PoolCard key={pool.id} pool={pool} />)
           : (
             <div className="col-span-full py-16 text-center text-[var(--text-muted)] text-sm">
-              No pools yet. Create a token to automatically deploy a pool.
+              {t.pools.noPools}
             </div>
           )}
     </div>

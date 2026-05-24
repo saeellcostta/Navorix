@@ -10,27 +10,21 @@ import { PriceChange } from "@/components/ui/PriceChange";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { formatUsd, shortenAddress } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { LiquidityPool } from "@/types/pool";
 
-interface PoolCardProps {
-  pool: LiquidityPool;
-}
+interface PoolCardProps { pool: LiquidityPool; }
 
 export function PoolCard({ pool }: PoolCardProps) {
+  const { t } = useLanguage();
+
   return (
     <Card hoverable className="h-full">
       <CardBody className="flex flex-col gap-4">
-        {/* Pool header */}
         <div className="flex items-center gap-3">
           <div className="relative h-10 w-10 rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface-3)]">
             {pool.tokenImageUrl ? (
-              <Image
-                src={pool.tokenImageUrl}
-                alt={pool.tokenName}
-                fill
-                className="object-cover"
-                sizes="40px"
-              />
+              <Image src={pool.tokenImageUrl} alt={pool.tokenName} fill className="object-cover" sizes="40px" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--gold)]">
                 {pool.tokenSymbol.charAt(0)}
@@ -38,67 +32,41 @@ export function PoolCard({ pool }: PoolCardProps) {
             )}
           </div>
           <div>
-            <p className="text-sm font-bold text-[var(--text-primary)]">
-              SOL / {pool.tokenSymbol}
-            </p>
-            <p className="text-xs text-[var(--text-muted)] font-mono">
-              {shortenAddress(pool.tokenMint)}
-            </p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">SOL / {pool.tokenSymbol}</p>
+            <p className="text-xs text-[var(--text-muted)] font-mono">{shortenAddress(pool.tokenMint)}</p>
           </div>
           <div className="ml-auto">
-            <Badge variant="gold">{pool.feePct * 100}% fee</Badge>
+            <Badge variant="gold">{pool.feePct * 100}% {t.pools.fee}</Badge>
           </div>
         </div>
 
-        {/* Stats grid */}
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-[var(--surface-2)] p-3">
           <div>
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
-              Liquidity
-            </p>
-            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">
-              {formatUsd(pool.totalLiquidity, true)}
-            </p>
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{t.pools.liquidity}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatUsd(pool.totalLiquidity, true)}</p>
           </div>
           <div>
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
-              Volume 24h
-            </p>
-            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">
-              {formatUsd(pool.volume24h, true)}
-            </p>
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{t.pools.volume24h}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">{formatUsd(pool.volume24h, true)}</p>
           </div>
           <div>
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
-              SOL Reserve
-            </p>
-            <p className="text-sm font-semibold text-[var(--text-secondary)] tabular-nums">
-              {pool.solReserve.toFixed(2)} SOL
-            </p>
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{t.pools.solReserve}</p>
+            <p className="text-sm font-semibold text-[var(--text-secondary)] tabular-nums">{pool.solReserve.toFixed(2)} SOL</p>
           </div>
           <div>
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
-              Price 24h
-            </p>
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{t.pools.price24h}</p>
             <PriceChange value={pool.priceChange24h} size="sm" />
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2">
-          <Link
-            href={`/pools/${pool.id}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")}
-          >
+          <Link href={`/pools/${pool.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1")}>
             <Droplets className="h-3.5 w-3.5" />
-            Add LP
+            {t.pools.addLP}
           </Link>
-          <Link
-            href={`/token/${pool.tokenMint}`}
-            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "flex-1")}
-          >
+          <Link href={`/token/${pool.tokenMint}`} className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "flex-1")}>
             <TrendingUp className="h-3.5 w-3.5" />
-            Trade
+            {t.pools.trade}
           </Link>
         </div>
       </CardBody>

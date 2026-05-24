@@ -159,7 +159,7 @@ export function Navbar() {
                     )}
                   >
                     {Icon && <Icon className="h-5 w-5" />}
-                    {label}
+                    {(t.nav as Record<string, string>)[href === "/" ? "dashboard" : href.replace("/", "")] ?? label}
                   </Link>
                 );
               })}

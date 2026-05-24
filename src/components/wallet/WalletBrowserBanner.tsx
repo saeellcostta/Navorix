@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from "react";
 import { Wallet, X } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
 function getWalletFromBrowser(): { name: string; displayName: string } | null {
@@ -32,6 +33,7 @@ function getWalletFromBrowser(): { name: string; displayName: string } | null {
 
 export function WalletBrowserBanner() {
   const { connected, connecting, select, connect } = useWallet();
+  const { t } = useLanguage();
   const [wallet, setWallet]     = useState<{ name: string; displayName: string } | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading]   = useState(false);
@@ -87,8 +89,8 @@ export function WalletBrowserBanner() {
           )}
         >
           {loading || connecting
-            ? "Conectando..."
-            : `Conectar ${wallet.displayName}`}
+            ? t.wallet.connecting
+            : `${t.wallet.connect} — ${wallet.displayName}`}
         </button>
       </div>
 
