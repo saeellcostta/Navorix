@@ -128,6 +128,20 @@ export function InitialBuyPanel({
             </p>
           </div>
 
+          {/* Mensagem Raydium — verde */}
+          <div className="flex items-start gap-2 rounded-lg border border-[var(--positive)]/30 bg-[rgba(34,197,94,0.06)] p-3">
+            <svg className="h-3.5 w-3.5 text-[var(--positive)] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-[var(--positive)] leading-relaxed">
+              Adicione pelo menos{" "}
+              <span className="font-bold">0.3 SOL</span>{" "}
+              para criar a pool e listar automaticamente no Raydium.
+              Com valores menores, o token ainda será criado normalmente,
+              mas a negociação pública poderá ser ativada depois.
+            </p>
+          </div>
+
           {/* Botões preset */}
           <div>
             <p className="text-xs font-medium text-[var(--text-muted)] mb-2 uppercase tracking-wider">
