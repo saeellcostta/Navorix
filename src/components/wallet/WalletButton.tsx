@@ -1,20 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-react";
+import { ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-react";
 import { useNavorixWallet } from "@/contexts/WalletContext";
 import { useSolBalance } from "@/hooks/useSolBalance";
 import { clearPhantomUrlParams } from "@/lib/phantomMobile";
 import { WalletSelectModal } from "./WalletSelectModal";
 import { cn } from "@/lib/utils";
 
+function getAvatarUrl(address: string): string {
+  return `https://api.dicebear.com/7.x/adventurer/svg?seed=${address}&backgroundColor=transparent`;
+}
+
 export function WalletButton() {
   const { connected, connecting, publicKeyStr, shortAddress, disconnectWallet } =
     useNavorixWallet();
   const { balance } = useSolBalance();
-  const [open, setOpen]         = useState(false);
+  const [open, setOpen]           = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [copied, setCopied]     = useState(false);
+  const [copied, setCopied]       = useState(false);
 
   useEffect(() => {
     clearPhantomUrlParams();
@@ -41,10 +45,8 @@ export function WalletButton() {
             "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           )}
         >
-          <Wallet className="h-4 w-4" />
           {connecting ? "Conectando..." : "Conectar Carteira"}
         </button>
-
         <WalletSelectModal open={modalOpen} onClose={() => setModalOpen(false)} />
       </>
     );
@@ -61,9 +63,18 @@ export function WalletButton() {
           "transition-all duration-200 cursor-pointer"
         )}
       >
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#fbbf24] to-[#d97706]">
-          <Wallet className="h-3.5 w-3.5 text-[#08080f]" />
+        {/* Avatar DiceBear */}
+        <div className="flex h-7 w-7 items-center justify-center rounded-full overflow-hidden border border-[var(--gold)]/30 bg-[var(--gold-dim)] shrink-0">
+          {publicKeyStr ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={getAvatarUrl(publicKeyStr)}
+              alt="avatar"
+              className="h-full w-full object-cover"
+            />
+          ) : null}
         </div>
+
         <div className="flex flex-col items-start leading-none">
           <span className="text-[var(--gold)] font-mono text-xs">{shortAddress}</span>
           {balance !== null && (
@@ -84,15 +95,25 @@ export function WalletButton() {
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className={cn(
-            "absolute right-0 top-full mt-2 z-40 w-56",
+            "absolute right-0 top-full mt-2 z-40 w-60",
             "rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)]",
-            "shadow-2xl shadow-black/60 py-1"
+            "shadow-2xl shadow-black/60 py-1 overflow-hidden"
           )}>
-            <div className="px-4 py-3 border-b border-[var(--border)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Carteira conectada</p>
-              <p className="text-sm font-mono text-[var(--gold)] break-all">{shortAddress}</p>
+            {/* Avatar grande no topo do dropdown */}
+            <div className="flex flex-col items-center gap-2 px-4 py-4 border-b border-[var(--border)] bg-[var(--surface-3)]">
+              <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-[var(--gold)]/40 bg-[var(--gold-dim)]">
+                {publicKeyStr && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={getAvatarUrl(publicKeyStr)}
+                    alt="avatar"
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
+              <p className="text-xs font-mono text-[var(--gold)]">{shortAddress}</p>
               {balance !== null && (
-                <p className="text-sm font-bold text-[var(--text-primary)] mt-1">
+                <p className="text-sm font-bold text-[var(--text-primary)]">
                   {balance.toFixed(4)} SOL
                 </p>
               )}
