@@ -19,6 +19,7 @@ import { useTokenCreation } from "@/hooks/useTokenCreation";
 import { TOKEN_CREATION_FEE_SOL, totalLaunchCostSol } from "@/config/solana";
 import { formatCompact } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { TokenCreateInput } from "@/types/token";
 
 const DEFAULTS: TokenCreateInput = {
@@ -33,18 +34,19 @@ const DEFAULTS: TokenCreateInput = {
   social: { twitter: "", telegram: "", website: "", discord: "" },
 };
 
-const CREATION_STEPS = [
-  { key: "uploading_image",      label: "Enviando imagem" },
-  { key: "uploading_metadata",   label: "Metadados Arweave" },
-  { key: "creating_mint",        label: "Mint Solana" },
-  { key: "registering_metadata", label: "Metadados on-chain" },
-  { key: "creating_pool",        label: "Pool Raydium" },
-  { key: "saving_to_db",         label: "Marketplace" },
+const CREATION_STEP_KEYS = [
+  "uploading_image",
+  "uploading_metadata",
+  "creating_mint",
+  "registering_metadata",
+  "creating_pool",
+  "saving_to_db",
 ] as const;
 
 export function TokenCreatorForm() {
   const { connected } = useWallet();
   const { balance } = useSolBalance();
+  const { t } = useLanguage();
   const { create, reset, step, stepLabel, loading, error, result } = useTokenCreation();
 
   const [form, setForm]               = useState<TokenCreateInput>(DEFAULTS);
@@ -87,10 +89,12 @@ export function TokenCreatorForm() {
               <CheckCircle className="h-8 w-8 text-[var(--positive)]" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Token Criado! 🎉</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">{t.create.success}</h2>
               {form.initialBuySol > 0 && (
                 <p className="text-sm text-[var(--positive)] mt-1">
-                  Você comprou <span className="font-bold">{formatCompact(tokensFromBuy)} ${form.symbol}</span> na compra inicial.
+                  {t.create.successBought
+                    .replace("{amount}", formatCompact(tokensFromBuy))
+                    .replace("{symbol}", form.symbol)}
                 </p>
               )}
             </div>
@@ -100,7 +104,7 @@ export function TokenCreatorForm() {
                 <p className="text-xs font-mono text-[var(--gold)] break-all">{result.mintAddress}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Transação</p>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">{t.common.solscan}</p>
                 <a href={`https://solscan.io/tx/${result.mintSignature}`} target="_blank" rel="noopener noreferrer"
                   className="text-xs font-mono text-[var(--gold)] break-all hover:underline inline-flex items-center gap-1">
                   {result.mintSignature.slice(0, 20)}... <ExternalLink className="h-3 w-3 shrink-0" />
@@ -110,11 +114,11 @@ export function TokenCreatorForm() {
             <div className="flex flex-col gap-2">
               <Link href={`/token/${result.mintAddress}`}
                 className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-lg bg-gradient-to-r from-[#fbbf24] to-[#d97706] text-[#08080f] font-bold text-sm">
-                Ver no marketplace
+                {t.create.viewMarketplace}
               </Link>
               <Button variant="outline" className="w-full"
                 onClick={() => { reset(); setForm(DEFAULTS); setImagePreview(null); setBannerPreview(null); }}>
-                Criar outro token
+                {t.create.createAnother}
               </Button>
             </div>
           </CardBody>
@@ -124,8 +128,17 @@ export function TokenCreatorForm() {
   }
 
   // ── Loading ──────────────────────────────────────────────────
+  const stepLabels: Record<string, string> = {
+    uploading_image:      t.create.uploading,
+    uploading_metadata:   t.create.metadata,
+    creating_mint:        t.create.mintingSolana,
+    registering_metadata: t.create.onChainMeta,
+    creating_pool:        t.create.creatingPool,
+    saving_to_db:         t.create.savingDb,
+  };
+
   if (loading) {
-    const currentIdx = CREATION_STEPS.findIndex(s => s.key === step);
+    const currentIdx = CREATION_STEP_KEYS.findIndex(k => k === step);
     return (
       <div className="max-w-lg mx-auto">
         <Card>
@@ -134,15 +147,15 @@ export function TokenCreatorForm() {
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--gold-dim)] mx-auto mb-3">
                 <Loader2 className="h-7 w-7 text-[var(--gold)] animate-spin" />
               </div>
-              <p className="text-base font-bold text-[var(--text-primary)]">{stepLabel}</p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">Não feche esta janela</p>
+              <p className="text-base font-bold text-[var(--text-primary)]">{stepLabels[step] ?? stepLabel}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">{t.create.dontClose}</p>
             </div>
             <div className="space-y-2">
-              {CREATION_STEPS.map((s, i) => {
+              {CREATION_STEP_KEYS.map((key, i) => {
                 const isDone   = i < currentIdx;
                 const isActive = i === currentIdx;
                 return (
-                  <div key={s.key} className="flex items-center gap-3">
+                  <div key={key} className="flex items-center gap-3">
                     <div className={[
                       "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
                       isDone   ? "bg-[var(--positive)] text-white" : "",
@@ -154,7 +167,7 @@ export function TokenCreatorForm() {
                       isDone   ? "text-[var(--positive)]" : "",
                       isActive ? "text-[var(--gold)] font-semibold" : "",
                       !isDone && !isActive ? "text-[var(--text-muted)]" : "",
-                    ].join(" ")}>{s.label}</p>
+                    ].join(" ")}>{stepLabels[key] ?? key}</p>
                   </div>
                 );
               })}
@@ -173,10 +186,10 @@ export function TokenCreatorForm() {
           <CardBody className="text-center py-8 space-y-4">
             <AlertTriangle className="h-10 w-10 text-[#ef4444] mx-auto" />
             <div>
-              <p className="text-base font-bold text-[var(--text-primary)]">Falha na criação</p>
+              <p className="text-base font-bold text-[var(--text-primary)]">{t.create.failed}</p>
               <p className="text-sm text-[#ef4444] mt-1 break-words">{error}</p>
             </div>
-            <Button variant="outline" onClick={reset} className="w-full">Tentar novamente</Button>
+            <Button variant="outline" onClick={reset} className="w-full">{t.create.tryAgain}</Button>
           </CardBody>
         </Card>
       </div>
@@ -195,19 +208,19 @@ export function TokenCreatorForm() {
             <div className="flex items-start gap-3 rounded-xl border border-[var(--gold)]/30 bg-[var(--gold-dim)] p-4">
               <AlertTriangle className="h-5 w-5 text-[var(--gold)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-[var(--gold)]">Conecte sua carteira</p>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Phantom, Solflare ou outra carteira Solana.</p>
+                <p className="text-sm font-semibold text-[var(--gold)]">{t.create.walletRequired}</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t.create.walletRequiredDesc}</p>
               </div>
             </div>
           )}
 
           {/* ── Imagem + Banner ── */}
           <Card>
-            <CardHeader><CardTitle>Mídia</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t.create.mediaSection}</CardTitle></CardHeader>
             <CardBody className="space-y-4">
               {/* Logo */}
               <div>
-                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">Logo do Token <span className="text-[var(--negative)] text-xs">*</span></p>
+                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">{t.create.logoLabel} <span className="text-[var(--negative)] text-xs">*</span></p>
                 <div onClick={() => imageRef.current?.click()}
                   className="flex items-center gap-4 rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-2)] p-4 cursor-pointer hover:border-[var(--border-strong)] transition-colors">
                   {imagePreview ? (
@@ -219,8 +232,8 @@ export function TokenCreatorForm() {
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{imagePreview ? "Trocar logo" : "Enviar logo"}</p>
-                    <p className="text-xs text-[var(--text-muted)]">PNG, JPG, GIF · 1:1 recomendado · max 15MB</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{imagePreview ? t.create.clickToChange : t.create.clickToUpload}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{t.create.logoHint}</p>
                   </div>
                   <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageChange(e, "image")} />
                 </div>
@@ -229,7 +242,7 @@ export function TokenCreatorForm() {
               {/* Banner */}
               <div>
                 <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Banner <span className="text-xs text-[var(--text-muted)]">(opcional)</span>
+                  {t.create.bannerLabel} <span className="text-xs text-[var(--text-muted)]">({t.create.optional})</span>
                 </p>
                 <div onClick={() => bannerRef.current?.click()}
                   className="relative flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-2)] overflow-hidden cursor-pointer hover:border-[var(--border-strong)] transition-colors h-24">
@@ -239,7 +252,7 @@ export function TokenCreatorForm() {
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-[var(--text-muted)]">
                       <ImageIcon className="h-6 w-6" />
-                      <span className="text-xs">Enviar banner · 16:9 recomendado · max 5MB</span>
+                      <span className="text-xs">{t.create.bannerHint}</span>
                     </div>
                   )}
                   <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageChange(e, "banner")} />
@@ -250,15 +263,15 @@ export function TokenCreatorForm() {
 
           {/* ── Informações ── */}
           <Card>
-            <CardHeader><CardTitle>Informações do Token</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t.create.infoSection}</CardTitle></CardHeader>
             <CardBody className="space-y-4">
-              <Input label="Nome do Token" placeholder="ex: Navorix Coin" maxLength={32}
+              <Input label={t.create.nameLabel} placeholder={t.create.namePlaceholder} maxLength={32}
                 value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                hint="Máximo 32 caracteres" required />
-              <Input label="Ticker / Símbolo" placeholder="ex: NVR" maxLength={10}
+                hint={t.create.nameHint} required />
+              <Input label={t.create.tickerLabel} placeholder={t.create.tickerPlaceholder} maxLength={10}
                 value={form.symbol} onChange={e => setForm(f => ({ ...f, symbol: e.target.value.toUpperCase() }))}
-                hint="Somente maiúsculas e números (máx. 10)" required />
-              <Textarea label="Descrição" placeholder="Descreva seu token para a comunidade..."
+                hint={t.create.tickerHint} required />
+              <Textarea label={t.create.descLabel} placeholder={t.create.descPlaceholder}
                 maxLength={280} value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 hint={`${form.description.length}/280`} />
@@ -267,7 +280,7 @@ export function TokenCreatorForm() {
 
           {/* ── Links Sociais ── */}
           <Card>
-            <CardHeader><CardTitle>Links Sociais <span className="text-xs font-normal text-[var(--text-muted)]">(opcional)</span></CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t.create.socialSection} <span className="text-xs font-normal text-[var(--text-muted)]">({t.create.optional})</span></CardTitle></CardHeader>
             <CardBody className="space-y-3">
               <Input
                 label="Share2 / X"
@@ -302,21 +315,21 @@ export function TokenCreatorForm() {
 
           {/* ── Parâmetros técnicos ── */}
           <Card>
-            <CardHeader><CardTitle>Parâmetros do Token</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t.create.paramsSection}</CardTitle></CardHeader>
             <CardBody className="space-y-4">
-              {/* Decimais — seletor de opções comuns */}
+              {/* Decimais */}
               <div>
                 <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Decimais
+                  {t.create.decimalsLabel}
                   <span className="ml-2 text-xs text-[var(--text-muted)] font-normal">
-                    — define a menor fração do token
+                    — {t.create.decimalsHint}
                   </span>
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 0, label: "0",       hint: "Token inteiro (sem fração)" },
-                    { value: 6, label: "6",       hint: "Padrão Solana (como USDC)" },
-                    { value: 9, label: "9",       hint: "Alta precisão (como SOL)" },
+                    { value: 0, label: "0",       hint: t.create.integerToken },
+                    { value: 6, label: "6",       hint: t.create.solanaDefault },
+                    { value: 9, label: "9",       hint: t.create.highPrecision },
                   ].map(({ value, label, hint }) => (
                     <button
                       key={value}
@@ -339,9 +352,9 @@ export function TokenCreatorForm() {
               {/* Supply total */}
               <div>
                 <p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Supply Total
+                  {t.create.supplyLabel}
                   <span className="ml-2 text-xs text-[var(--text-muted)] font-normal">
-                    — quantidade de tokens a criar
+                    — {t.create.supplyHint}
                   </span>
                 </p>
                 <div className="grid grid-cols-3 gap-2 mb-2">
@@ -366,7 +379,7 @@ export function TokenCreatorForm() {
                   ))}
                 </div>
                 <Input
-                  placeholder="Ou digite um valor personalizado..."
+                  placeholder={t.create.customValue}
                   type="number"
                   min={1}
                   value={form.initialSupply === 1_000_000 || form.initialSupply === 1_000_000_000 || form.initialSupply === 1_000_000_000_000
@@ -377,7 +390,7 @@ export function TokenCreatorForm() {
                     const v = parseInt(e.target.value);
                     if (v > 0) setForm(f => ({ ...f, initialSupply: v }));
                   }}
-                  hint={`Supply atual: ${formatCompact(form.initialSupply)} tokens`}
+                  hint={`${t.create.currentSupply} ${formatCompact(form.initialSupply)}`}
                 />
               </div>
             </CardBody>
@@ -406,13 +419,13 @@ export function TokenCreatorForm() {
               loading={loading} leftIcon={<Zap className="h-5 w-5" />}
               disabled={!hasEnoughSol}>
               {form.initialBuySol > 0
-                ? `Criar ${form.symbol || "Token"} · Comprar ${form.initialBuySol} SOL`
-                : `Criar ${form.symbol || "Token"} na Solana`}
+                ? t.create.createWithBuy.replace("{symbol}", form.symbol || "Token").replace("{sol}", String(form.initialBuySol))
+                : t.create.createButton.replace("{symbol}", form.symbol || "Token")}
             </Button>
           )}
 
           <p className="text-center text-xs text-[var(--text-muted)]">
-            Dados imutáveis após criação · Taxa: {TOKEN_CREATION_FEE_SOL} SOL
+            {t.create.immutableNote}
           </p>
         </div>
 

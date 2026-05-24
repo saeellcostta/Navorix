@@ -4,6 +4,7 @@ import React from "react";
 import { Globe, MessageCircle, Users, Zap, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCompact } from "@/utils/format";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { TokenCreateInput } from "@/types/token";
 
 interface TokenPreviewProps {
@@ -13,6 +14,20 @@ interface TokenPreviewProps {
 }
 
 export function TokenPreview({ form, imagePreview, bannerPreview }: TokenPreviewProps) {
+  const { t, lang } = useLanguage();
+
+  const previewLabel: Record<string, string> = {
+    "pt-BR": "Pré-visualização em tempo real",
+    en:      "Real-time Preview",
+    es:      "Vista previa en tiempo real",
+    zh:      "实时预览",
+    ja:      "リアルタイムプレビュー",
+    ko:      "실시간 미리보기",
+    ru:      "Предварительный просмотр",
+    de:      "Echtzeit-Vorschau",
+    fr:      "Aperçu en temps réel",
+    tr:      "Gerçek Zamanlı Önizleme",
+  };
   const hasName   = form.name.trim().length > 0;
   const hasSymbol = form.symbol.trim().length > 0;
   const hasSocial = form.social.twitter || form.social.telegram || form.social.website || form.social.discord;
@@ -24,7 +39,7 @@ export function TokenPreview({ form, imagePreview, bannerPreview }: TokenPreview
       <div className="flex items-center gap-2 mb-1">
         <div className="h-1.5 w-1.5 rounded-full bg-[var(--positive)] animate-pulse" />
         <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-          Pré-visualização em tempo real
+          {previewLabel[lang] ?? "Real-time Preview"}
         </p>
       </div>
 
@@ -92,7 +107,7 @@ export function TokenPreview({ form, imagePreview, bannerPreview }: TokenPreview
               {form.description}
             </p>
           ) : (
-            <p className="text-xs text-[var(--text-muted)] italic mb-3">Adicione uma descrição...</p>
+            <p className="text-xs text-[var(--text-muted)] italic mb-3">{t.create.descPlaceholder}</p>
           )}
 
           {/* Stats */}
@@ -141,16 +156,16 @@ export function TokenPreview({ form, imagePreview, bannerPreview }: TokenPreview
       {/* Checklist de completude */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 space-y-2">
         <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-          Completude do token
+          {t.create.paramsSection}
         </p>
         {[
-          { label: "Nome",           done: hasName },
-          { label: "Ticker",         done: hasSymbol },
-          { label: "Imagem/Logo",    done: !!imagePreview },
-          { label: "Descrição",      done: form.description.length > 10 },
-          { label: "Bandeira",       done: !!bannerPreview },
-          { label: "Links sociais",  done: !!hasSocial },
-          { label: "Compra inicial", done: form.initialBuySol > 0 },
+          { label: t.create.nameLabel,    done: hasName },
+          { label: t.create.tickerLabel,  done: hasSymbol },
+          { label: t.create.logoLabel,    done: !!imagePreview },
+          { label: t.create.descLabel,    done: form.description.length > 10 },
+          { label: t.create.bannerLabel,  done: !!bannerPreview },
+          { label: t.create.socialSection,done: !!hasSocial },
+          { label: t.create.initialBuy,   done: form.initialBuySol > 0 },
         ].map(({ label, done }) => (
           <div key={label} className="flex items-center gap-2">
             <div className={cn(
@@ -186,7 +201,7 @@ export function TokenPreview({ form, imagePreview, bannerPreview }: TokenPreview
         })()}
       </div>
 
-      <p className="text-[10px] text-[var(--text-muted)] text-center">Dados imutáveis após criação on-chain</p>
+      <p className="text-[10px] text-[var(--text-muted)] text-center">{t.create.immutableNote}</p>
     </div>
   );
 }
