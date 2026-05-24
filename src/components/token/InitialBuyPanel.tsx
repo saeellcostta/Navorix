@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { Coins, Zap, Info, ChevronDown, ChevronUp, AlertTriangle, CheckCircle } from "lucide-react";
+import React, { useState } from "react";
+import { Coins, Zap, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
 import {
@@ -12,8 +12,6 @@ import {
 } from "@/config/solana";
 import { formatCompact } from "@/utils/format";
 
-const RAYDIUM_MIN_SOL = 0.3;
-
 interface InitialBuyPanelProps {
   value: number;
   onChange: (sol: number) => void;
@@ -21,14 +19,26 @@ interface InitialBuyPanelProps {
   supply?: number;
 }
 
-export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_000 }: InitialBuyPanelProps) {
-  const tokensPerSol = getTokensPerSol(supply);
-  const [expanded, setExpanded] = useState(false);
+/** Garante número finito — evita NaN/Infinity em cálculos */
+function safe(n: number, fallback = 0): number {
+  return isFinite(n) && !isNaN(n) ? n : fallback;
+}
+
+export function InitialBuyPanel({
+  value,
+  onChange,
+  symbol,
+  supply = 1_000_000_000,
+}: InitialBuyPanelProps) {
+  const safeSupply    = safe(supply, 1_000_000_000) || 1_000_000_000;
+  const tokensPerSol  = getTokensPerSol(safeSupply);
+  const tokensReceived = solToTokensAtLaunch(safe(value), safeSupply);
+  const pctOfSupply   = safe((safe(value) * tokensPerSol) / safeSupply * 100);
+
+  const [expanded, setExpanded]       = useState(false);
   const [customInput, setCustomInput] = useState("");
 
-  const tokensReceived = solToTokensAtLaunch(value, supply);
   const isActive = value > 0;
-  const hasMinLiquidity = value >= RAYDIUM_MIN_SOL;
 
   const handlePreset = (sol: number) => {
     onChange(sol);
@@ -37,12 +47,16 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
 
   const handleCustomChange = (raw: string) => {
     setCustomInput(raw);
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= MAX_INITIAL_BUY_SOL) {
-      onChange(parsed);
-    } else if (raw === "" || raw === "0") {
+
+    // Aceita vazio e valores intermediários como "0." sem crash
+    if (!raw || raw === "0" || raw === "0.") {
       onChange(0);
+      return;
     }
+
+    const parsed = parseFloat(raw);
+    if (isNaN(parsed) || !isFinite(parsed)) return; // ignora silenciosamente
+    onChange(Math.min(Math.max(parsed, 0), MAX_INITIAL_BUY_SOL));
   };
 
   const handleSkip = () => {
@@ -62,19 +76,15 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
       {/* Header toggle */}
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded(v => !v)}
         className="flex w-full items-center justify-between px-5 py-4 text-left cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
-              isActive
-                ? "bg-[var(--gold-dim)] text-[var(--gold)]"
-                : "bg-[var(--surface-3)] text-[var(--text-muted)]"
-            )}
-          >
-            <Coins className="h-4.5 w-4.5" />
+          <div className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+            isActive ? "bg-[var(--gold-dim)] text-[var(--gold)]" : "bg-[var(--surface-3)] text-[var(--text-muted)]"
+          )}>
+            <Coins className="h-4 w-4" />
           </div>
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">
@@ -95,18 +105,17 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
               {value} SOL
             </span>
           )}
-          {expanded ? (
-            <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-          )}
+          {expanded
+            ? <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" />
+            : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
         </div>
       </button>
 
-      {/* Expandable body */}
+      {/* Corpo expansível */}
       {expanded && (
         <div className="border-t border-[var(--border)] px-5 pb-5 pt-4 space-y-4">
-          {/* Info banner */}
+
+          {/* Taxa dinâmica */}
           <div className="flex items-start gap-2 rounded-lg bg-[var(--surface-2)] p-3">
             <Info className="h-3.5 w-3.5 text-[var(--gold)] shrink-0 mt-0.5" />
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
@@ -114,36 +123,18 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
               <span className="font-bold text-[var(--gold)]">
                 1 SOL = {formatCompact(tokensPerSol)} {symbol || "tokens"}
               </span>
-              {" "}(10% do supply). Você é o primeiro comprador.
+              {" "}(10% do fornecimento). Você é o primeiro comprador —{" "}
+              vantagem de preço máxima.
             </p>
           </div>
 
-          {/* Raydium minimum warning */}
-          {!isActive || !hasMinLiquidity ? (
-            <div className="flex items-start gap-2 rounded-lg border border-[#ef4444]/30 bg-[rgba(239,68,68,0.06)] p-3">
-              <AlertTriangle className="h-3.5 w-3.5 text-[#ef4444] shrink-0 mt-0.5" />
-              <p className="text-xs text-[#ef4444] leading-relaxed">
-                <span className="font-bold">Mínimo de {RAYDIUM_MIN_SOL} SOL</span> para criar pool e listar automaticamente no Raydium.
-                Abaixo disso o token é criado mas <span className="font-bold">não poderá ser negociado</span>.
-              </p>
-            </div>
-          ) : (
-            <div className="flex items-start gap-2 rounded-lg border border-[#22c55e]/30 bg-[rgba(34,197,94,0.06)] p-3">
-              <CheckCircle className="h-3.5 w-3.5 text-[#22c55e] shrink-0 mt-0.5" />
-              <p className="text-xs text-[#22c55e] leading-relaxed">
-                <span className="font-bold">Pool Raydium será criada automaticamente!</span>{" "}
-                Seu token ficará disponível para compra e venda imediatamente após o lançamento.
-              </p>
-            </div>
-          )}
-
-          {/* Preset buttons */}
+          {/* Botões preset */}
           <div>
             <p className="text-xs font-medium text-[var(--text-muted)] mb-2 uppercase tracking-wider">
               Valores rápidos
             </p>
             <div className="grid grid-cols-4 gap-2">
-              {INITIAL_BUY_PRESETS_SOL.map((sol) => (
+              {INITIAL_BUY_PRESETS_SOL.map(sol => (
                 <button
                   key={sol}
                   type="button"
@@ -156,47 +147,40 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
                       : "border-[var(--border)] bg-[var(--surface-2)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)]"
                   )}
                 >
-                  <span
-                    className={cn(
-                      "text-sm font-extrabold",
-                      value === sol ? "text-[var(--gold)]" : "text-[var(--text-primary)]"
-                    )}
-                  >
+                  <span className={cn(
+                    "text-sm font-extrabold",
+                    value === sol ? "text-[var(--gold)]" : "text-[var(--text-primary)]"
+                  )}>
                     {sol} SOL
                   </span>
-                  <span className="text-[10px] text-[var(--text-muted)] leading-tight">
-                    {formatCompact(solToTokensAtLaunch(sol, supply))}
+                  <span className="text-[10px] text-[var(--text-muted)] leading-tight text-center">
+                    {formatCompact(solToTokensAtLaunch(sol, safeSupply))}
                     <br />
                     {symbol || "tokens"}
                   </span>
-                  {sol >= RAYDIUM_MIN_SOL && (
-                    <span className="text-[9px] text-[#22c55e] font-bold mt-0.5">✓ Raydium</span>
-                  )}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Custom amount */}
-          <div>
-            <Input
-              label="Valor personalizado (SOL)"
-              type="number"
-              placeholder="ex: 0.05"
-              min={0}
-              max={MAX_INITIAL_BUY_SOL}
-              step={0.01}
-              value={customInput}
-              onChange={(e) => handleCustomChange(e.target.value)}
-              rightAdornment={
-                <span className="text-xs font-semibold text-[var(--gold)]">SOL</span>
-              }
-              hint={`Mínimo ${RAYDIUM_MIN_SOL} SOL para listar no Raydium · Máximo ${MAX_INITIAL_BUY_SOL} SOL`}
-            />
-          </div>
+          {/* Input personalizado */}
+          <Input
+            label="Valor personalizado (SOL)"
+            type="number"
+            placeholder="ex: 0.05"
+            min={0}
+            max={MAX_INITIAL_BUY_SOL}
+            step={0.01}
+            value={customInput}
+            onChange={e => handleCustomChange(e.target.value)}
+            rightAdornment={
+              <span className="text-xs font-semibold text-[var(--gold)]">SOL</span>
+            }
+            hint={`Máximo ${MAX_INITIAL_BUY_SOL} SOL por criação`}
+          />
 
-          {/* Live preview */}
-          {value > 0 && (
+          {/* Preview "Você terá" — só mostra quando há valor válido */}
+          {value > 0 && tokensReceived > 0 && (
             <div className="rounded-xl border border-[var(--gold)]/20 bg-[var(--surface-2)] p-4 space-y-2">
               <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 Você receberá
@@ -210,26 +194,23 @@ export function InitialBuyPanel({ value, onChange, symbol, supply = 1_000_000_00
                     {formatCompact(tokensReceived)}
                   </p>
                   <p className="text-xs text-[var(--text-muted)]">
-                    {symbol || "TOKEN"} por {value} SOL
-                    {" "}·{" "}
-                    {((value * tokensPerSol) / supply * 100).toFixed(1)}% do supply
+                    {symbol || "TOKEN"} por {value} SOL · {pctOfSupply.toFixed(1)}% do supply
                   </p>
                 </div>
               </div>
-              {/* Breakdown bar */}
-              <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-3)] overflow-hidden">
+              <div className="h-1.5 rounded-full bg-[var(--surface-3)] overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[#fbbf24] to-[#d97706] transition-all duration-300"
-                  style={{ width: `${Math.min((value / MAX_INITIAL_BUY_SOL) * 100, 100)}%` }}
+                  style={{ width: `${Math.min(safe(value / MAX_INITIAL_BUY_SOL) * 100, 100)}%` }}
                 />
               </div>
               <p className="text-[10px] text-[var(--text-muted)] text-right">
-                {((value / MAX_INITIAL_BUY_SOL) * 100).toFixed(1)}% do limite por lançamento
+                {(safe(value / MAX_INITIAL_BUY_SOL) * 100).toFixed(1)}% do limite por lançamento
               </p>
             </div>
           )}
 
-          {/* Skip button */}
+          {/* Pular */}
           {value > 0 && (
             <button
               type="button"
