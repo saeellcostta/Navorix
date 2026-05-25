@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { X, Droplets, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { createCpmmPool } from "@/services/solana/raydiumService";
+import { LAMPORTS_PER_SOL } from "@/config/solana";
 
 interface Props {
   mintAddress: string;
@@ -22,12 +24,16 @@ export function AddLiquidityModal({
   onSuccess,
 }: Props) {
   const { publicKey, connected } = useWallet();
+  const wallet = useWallet();
+  const { connection } = useConnection();
   const [solAmount, setSolAmount] = useState("");
   const [tokenAmount, setTokenAmount] = useState("");
   const [slippage, setSlippage] = useState("1");
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [txSig, setTxSig] = useState<string | null>(null);
 
   // Calcula tokens proporcionais ao SOL digitado
   useEffect(() => {
@@ -54,9 +60,34 @@ export function AddLiquidityModal({
 
     setLoading(true);
     setError(null);
+    setStep("Preparando transação...");
 
     try {
-      const res = await fetch(`/api/pools/${mintAddress}/liquidity`, {
+      // Busca decimais do token no banco
+      const tokenRes = await fetch(`/api/tokens?mint=${mintAddress}`);
+      let decimals = 6;
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        if (Array.isArray(tokenData) && tokenData.length > 0) {
+          decimals = tokenData[0].decimals ?? 6;
+        }
+      }
+
+      setStep("Aguardando assinatura na Phantom...");
+
+      // Cria pool Raydium CPMM on-chain
+      const result = await createCpmmPool(connection, wallet, {
+        mintAddress,
+        solAmountLamports: Math.floor(sol * LAMPORTS_PER_SOL),
+        tokenAmount: Math.floor(tokens * 10 ** decimals),
+        decimals,
+      });
+
+      setStep("Confirmando transação...");
+      setTxSig(result.signature);
+
+      // Atualiza banco de dados
+      await fetch(`/api/pools/${mintAddress}/liquidity`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -64,20 +95,19 @@ export function AddLiquidityModal({
           solAmount: sol,
           tokenAmount: tokens,
           slippagePct: parseFloat(slippage) / 100,
+          raydiumPoolId: result.poolId,
+          txSignature: result.signature,
         }),
       });
 
-      if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error ?? "Erro ao adicionar liquidez.");
-      }
-
+      setStep(null);
       setSuccess(true);
       setTimeout(() => {
         onSuccess?.();
         onClose();
-      }, 2000);
+      }, 3000);
     } catch (err) {
+      setStep(null);
       setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setLoading(false);
@@ -120,21 +150,15 @@ export function AddLiquidityModal({
         }
         .alm-close:hover { color: #f9fafb; border-color: rgba(255,255,255,0.2); }
         .alm-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-
-        /* Pool info */
         .alm-pool-info {
           display: flex; gap: 0.5rem;
           background: rgba(56,189,248,0.06);
           border: 1px solid rgba(56,189,248,0.15);
           border-radius: 12px; padding: 0.75rem;
         }
-        .alm-pool-item {
-          flex: 1; text-align: center;
-        }
+        .alm-pool-item { flex: 1; text-align: center; }
         .alm-pool-label { font-size: 0.6875rem; color: #6b7280; margin-bottom: 0.2rem; }
         .alm-pool-value { font-size: 0.875rem; font-weight: 700; color: #f9fafb; }
-
-        /* Input group */
         .alm-input-group { display: flex; flex-direction: column; gap: 0.375rem; }
         .alm-label {
           font-size: 0.75rem; font-weight: 600;
@@ -160,8 +184,6 @@ export function AddLiquidityModal({
           color: #fbbf24; white-space: nowrap;
         }
         .alm-input[disabled] { color: #6b7280; }
-
-        /* Slippage */
         .alm-slippage { display: flex; gap: 0.375rem; }
         .alm-slip-btn {
           flex: 1; padding: 0.4rem;
@@ -181,22 +203,29 @@ export function AddLiquidityModal({
           padding: 0.4rem 0.5rem; text-align: center;
           font-size: 0.75rem; font-weight: 600; color: #f9fafb;
         }
-
-        /* Summary */
         .alm-summary {
           background: rgba(255,255,255,0.03);
           border: 1px solid rgba(255,255,255,0.06);
           border-radius: 12px; padding: 0.75rem;
           display: flex; flex-direction: column; gap: 0.5rem;
         }
-        .alm-summary-row {
-          display: flex; justify-content: space-between;
-          font-size: 0.75rem;
-        }
+        .alm-summary-row { display: flex; justify-content: space-between; font-size: 0.75rem; }
         .alm-summary-label { color: #6b7280; }
         .alm-summary-value { color: #f9fafb; font-weight: 600; }
-
-        /* Error / Success */
+        .alm-step {
+          display: flex; align-items: center; gap: 0.5rem;
+          background: rgba(251,191,36,0.08);
+          border: 1px solid rgba(251,191,36,0.2);
+          border-radius: 10px; padding: 0.75rem;
+          font-size: 0.8125rem; color: #fbbf24;
+        }
+        .alm-step-spinner {
+          width: 14px; height: 14px; border-radius: 50%;
+          border: 2px solid rgba(251,191,36,0.3);
+          border-top-color: #fbbf24;
+          animation: alm-spin 0.8s linear infinite; flex-shrink: 0;
+        }
+        @keyframes alm-spin { to { transform: rotate(360deg); } }
         .alm-error {
           display: flex; align-items: flex-start; gap: 0.5rem;
           background: rgba(239,68,68,0.08);
@@ -205,14 +234,15 @@ export function AddLiquidityModal({
           font-size: 0.8125rem; color: #f87171;
         }
         .alm-success {
-          display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+          display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
           background: rgba(34,197,94,0.08);
           border: 1px solid rgba(34,197,94,0.2);
           border-radius: 10px; padding: 0.75rem;
-          font-size: 0.875rem; font-weight: 600; color: #4ade80;
+          font-size: 0.875rem; font-weight: 600; color: #4ade80; text-align: center;
         }
-
-        /* Button */
+        .alm-tx-link {
+          font-size: 0.75rem; color: #4ade80; text-decoration: underline; font-weight: 400;
+        }
         .alm-btn {
           width: 100%; padding: 0.875rem;
           border-radius: 12px; border: none;
@@ -230,7 +260,6 @@ export function AddLiquidityModal({
 
       <div className="alm-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
         <div className="alm-modal">
-          {/* Header */}
           <div className="alm-header">
             <div className="alm-title">
               <Droplets size={16} className="alm-title-icon" />
@@ -242,7 +271,6 @@ export function AddLiquidityModal({
           </div>
 
           <div className="alm-body">
-            {/* Pool atual */}
             <div className="alm-pool-info">
               <div className="alm-pool-item">
                 <div className="alm-pool-label">Reserva SOL</div>
@@ -254,67 +282,39 @@ export function AddLiquidityModal({
               </div>
             </div>
 
-            {/* Input SOL */}
             <div className="alm-input-group">
-              <div className="alm-label">
-                <span>Você adiciona</span>
-              </div>
+              <div className="alm-label"><span>Você adiciona</span></div>
               <div className="alm-input-wrap">
-                <input
-                  type="number"
-                  className="alm-input"
-                  placeholder="0.0"
-                  value={solAmount}
-                  onChange={(e) => setSolAmount(e.target.value)}
-                  min="0"
-                  step="0.1"
-                />
+                <input type="number" className="alm-input" placeholder="0.0"
+                  value={solAmount} onChange={(e) => setSolAmount(e.target.value)} min="0" step="0.1" />
                 <span className="alm-input-suffix">SOL</span>
               </div>
             </div>
 
-            {/* Input Token (readonly) */}
             <div className="alm-input-group">
               <div className="alm-label">
                 <span>Equivalente em tokens</span>
                 <span style={{ color: "#6b7280" }}>Calculado automaticamente</span>
               </div>
               <div className="alm-input-wrap">
-                <input
-                  type="number"
-                  className="alm-input"
-                  placeholder="0"
-                  value={tokenAmount}
-                  disabled
-                />
+                <input type="number" className="alm-input" placeholder="0" value={tokenAmount} disabled />
                 <span className="alm-input-suffix">${tokenSymbol}</span>
               </div>
             </div>
 
-            {/* Slippage */}
             <div className="alm-input-group">
               <div className="alm-label"><span>Tolerância de slippage</span></div>
               <div className="alm-slippage">
                 {["0.5", "1", "2"].map((v) => (
-                  <button
-                    key={v}
-                    className={`alm-slip-btn ${slippage === v ? "active" : ""}`}
-                    onClick={() => setSlippage(v)}
-                  >
-                    {v}%
-                  </button>
+                  <button key={v} className={`alm-slip-btn ${slippage === v ? "active" : ""}`}
+                    onClick={() => setSlippage(v)}>{v}%</button>
                 ))}
-                <input
-                  type="number"
-                  className="alm-slip-custom"
-                  placeholder="Custom"
+                <input type="number" className="alm-slip-custom" placeholder="Custom"
                   value={["0.5", "1", "2"].includes(slippage) ? "" : slippage}
-                  onChange={(e) => setSlippage(e.target.value)}
-                />
+                  onChange={(e) => setSlippage(e.target.value)} />
               </div>
             </div>
 
-            {/* Resumo */}
             {solAmount && parseFloat(solAmount) > 0 && (
               <div className="alm-summary">
                 <div className="alm-summary-row">
@@ -332,7 +332,13 @@ export function AddLiquidityModal({
               </div>
             )}
 
-            {/* Erro */}
+            {step && (
+              <div className="alm-step">
+                <div className="alm-step-spinner" />
+                {step}
+              </div>
+            )}
+
             {error && (
               <div className="alm-error">
                 <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -340,20 +346,21 @@ export function AddLiquidityModal({
               </div>
             )}
 
-            {/* Sucesso */}
             {success && (
               <div className="alm-success">
-                <CheckCircle2 size={16} />
+                <CheckCircle2 size={18} />
                 Liquidez adicionada com sucesso!
+                {txSig && (
+                  <a href={`https://solscan.io/tx/${txSig}`} target="_blank" rel="noopener noreferrer"
+                    className="alm-tx-link">
+                    Ver transação no Solscan
+                  </a>
+                )}
               </div>
             )}
 
-            {/* Botão */}
-            <button
-              className="alm-btn"
-              onClick={handleSubmit}
-              disabled={loading || success || !solAmount || parseFloat(solAmount) <= 0}
-            >
+            <button className="alm-btn" onClick={handleSubmit}
+              disabled={loading || success || !solAmount || parseFloat(solAmount) <= 0}>
               {loading ? "Processando..." : success ? "Concluído!" : "Adicionar Liquidez"}
             </button>
           </div>
