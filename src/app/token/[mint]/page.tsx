@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, Users, BarChart3, Droplets, TrendingUp } from 
 import { TradePanel } from "@/components/token/TradePanel";
 import { PriceChart } from "@/components/token/PriceChart";
 import { TradeHistory } from "@/components/token/TradeHistory";
+import { AddLiquidityButton } from "@/components/token/AddLiquidityButton";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { PriceChange } from "@/components/ui/PriceChange";
@@ -199,6 +200,13 @@ export default async function TokenDetailPage({ params }: PageProps) {
             mintAddress={mint}
             tokenSymbol={token.symbol}
             poolId={pool?.raydiumPoolId ?? null}
+          />
+
+          <AddLiquidityButton
+            mintAddress={mint}
+            tokenSymbol={token.symbol}
+            solReserve={pool?.solReserve ?? 0}
+            tokenReserve={pool?.tokenReserve ?? 0}
           />
 
           {/* Links externos */}
