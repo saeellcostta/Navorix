@@ -1,138 +1,88 @@
 "use client";
 
-/**
- * useTokenStats — fetches real-time market data from DexScreener
- * Called when the user opens a token page.
- * Falls back to DB stats if DexScreener has no data yet.
- */
+import { BarChart3, Droplets, TrendingUp, Users, RefreshCw } from "lucide-react";
+import { useTokenStats } from "@/hooks/useTokenStats";
+import { formatUsd, formatCompact } from "@/utils/format";
+import { PriceChange } from "@/components/ui/PriceChange";
 
-import { useState, useEffect } from "react";
-
-export interface LiveTokenStats {
-  priceUsd:       number;
-  priceSol:       number;
-  priceChange24h: number;
-  marketCap:      number;
-  volume24h:      number;
-  liquidity:      number;
-  txCount24h:     number;
-  source:         "dexscreener" | "db" | "none";
-}
-
-interface DexScreenerPair {
-  chainId:     string;
-  priceNative: string;
-  priceUsd?:   string;
-  txns:        { h24: { buys: number; sells: number } };
-  volume:      { h24: number };
-  priceChange: { h24: number };
-  liquidity?:  { usd: number };
-  fdv?:        number;
-  marketCap?:  number;
-}
-
-async function fetchDexScreener(mintAddress: string): Promise<DexScreenerPair | null> {
-  try {
-    const res = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`,
-      { next: { revalidate: 30 } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.pairs || data.pairs.length === 0) return null;
-
-    const solanaPairs = data.pairs.filter((p: DexScreenerPair) => p.chainId === "solana");
-    if (solanaPairs.length === 0) return null;
-
-    return solanaPairs.sort((a: DexScreenerPair, b: DexScreenerPair) =>
-      (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
-    )[0];
-  } catch {
-    return null;
-  }
-}
-
-async function getSolPrice(): Promise<number> {
-  try {
-    const res = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
-      { next: { revalidate: 60 } }
-    );
-    const json = await res.json();
-    return json?.solana?.usd ?? 145;
-  } catch {
-    return 145;
-  }
-}
-
-export function useTokenStats(
-  mintAddress: string,
+interface Props {
+  mintAddress: string;
+  symbol: string;
   dbStats?: {
     price?: number;
     priceChange24h?: number;
     marketCap?: number;
     volume24h?: number;
     liquidity?: number;
-  } | null
-): { stats: LiveTokenStats | null; loading: boolean; refresh: () => void } {
-  const [stats, setStats]     = useState<LiveTokenStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick]       = useState(0);
+    holders?: number;
+  } | null;
+}
 
-  const refresh = () => setTick(t => t + 1);
+export function TokenStatsPanel({ mintAddress, symbol, dbStats }: Props) {
+  const { stats, loading, refresh } = useTokenStats(mintAddress, dbStats);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const price         = stats?.priceUsd ?? dbStats?.price ?? 0;
+  const priceChange   = stats?.priceChange24h ?? dbStats?.priceChange24h ?? 0;
+  const marketCap     = stats?.marketCap ?? dbStats?.marketCap ?? 0;
+  const liquidity     = stats?.liquidity ?? dbStats?.liquidity ?? 0;
+  const volume24h     = stats?.volume24h ?? dbStats?.volume24h ?? 0;
+  const holders       = dbStats?.holders ?? 0;
+  const isDex         = stats?.source === "dexscreener";
 
-    async function load() {
-      const [pair, solPrice] = await Promise.all([
-        fetchDexScreener(mintAddress),
-        getSolPrice(),
-      ]);
+  return (
+    <div className="space-y-3">
+      {/* Preço principal */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-2xl font-extrabold text-[var(--text-primary)] tabular-nums">
+          {loading ? (
+            <span className="inline-block h-7 w-24 rounded bg-[var(--surface-3)] animate-pulse" />
+          ) : (
+            formatUsd(price)
+          )}
+        </span>
+        {!loading && <PriceChange value={priceChange} size="md" />}
+        <button
+          onClick={refresh}
+          className="ml-auto flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors cursor-pointer"
+          title="Atualizar dados"
+        >
+          <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+          {isDex ? (
+            <span className="text-[var(--positive)]">ao vivo</span>
+          ) : (
+            <span>atualizar</span>
+          )}
+        </button>
+      </div>
 
-      if (cancelled) return;
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Market Cap",  value: loading ? null : formatUsd(marketCap, true),  icon: <BarChart3 className="h-4 w-4" /> },
+          { label: "Liquidez",    value: loading ? null : formatUsd(liquidity, true),  icon: <Droplets className="h-4 w-4" /> },
+          { label: "Volume 24h",  value: loading ? null : formatUsd(volume24h, true),  icon: <TrendingUp className="h-4 w-4" /> },
+          { label: "Holders",     value: loading ? null : formatCompact(holders),      icon: <Users className="h-4 w-4" /> },
+        ].map(({ label, value, icon }) => (
+          <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-3">
+            <div className="flex items-center gap-1.5 text-[var(--text-muted)] mb-1">
+              {icon}
+              <span className="text-[10px] uppercase tracking-wider">{label}</span>
+            </div>
+            {value === null ? (
+              <div className="h-5 w-16 rounded bg-[var(--surface-3)] animate-pulse" />
+            ) : (
+              <p className="text-base font-bold text-[var(--text-primary)] tabular-nums">{value}</p>
+            )}
+          </div>
+        ))}
+      </div>
 
-      if (pair && pair.priceUsd) {
-        const priceUsd = parseFloat(pair.priceUsd);
-        setStats({
-          priceUsd,
-          priceSol:       priceUsd / solPrice,
-          priceChange24h: pair.priceChange?.h24 ?? 0,
-          marketCap:      pair.marketCap ?? pair.fdv ?? 0,
-          volume24h:      pair.volume?.h24 ?? 0,
-          liquidity:      pair.liquidity?.usd ?? 0,
-          txCount24h:     (pair.txns?.h24?.buys ?? 0) + (pair.txns?.h24?.sells ?? 0),
-          source:         "dexscreener",
-        });
-      } else if (dbStats?.price) {
-        // Fallback to DB stats
-        setStats({
-          priceUsd:       dbStats.price,
-          priceSol:       dbStats.price / solPrice,
-          priceChange24h: dbStats.priceChange24h ?? 0,
-          marketCap:      dbStats.marketCap ?? 0,
-          volume24h:      dbStats.volume24h ?? 0,
-          liquidity:      dbStats.liquidity ?? 0,
-          txCount24h:     0,
-          source:         "db",
-        });
-      } else {
-        setStats(null);
-      }
-
-      setLoading(false);
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [mintAddress, tick]);
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 30_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return { stats, loading, refresh };
+      {/* Fonte dos dados */}
+      {!loading && (
+        <p className="text-[10px] text-[var(--text-muted)] text-right">
+          {isDex ? "📡 Dados em tempo real via DexScreener" : "🗄️ Dados do banco · atualiza ao abrir"}
+        </p>
+      )}
+    </div>
+  );
 }
