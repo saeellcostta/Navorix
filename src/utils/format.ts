@@ -1,21 +1,29 @@
 /**
  * Format a number as USD currency.
+ * Handles very small meme coin prices (e.g. $0.000000029)
  */
 export function formatUsd(value: number, compact = false): string {
+  if (!value || isNaN(value)) return "$0.00";
+
   if (compact) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      notation: "compact",
-      maximumFractionDigits: 2,
-    }).format(value);
+    if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+    if (value >= 1_000_000)     return `$${(value / 1_000_000).toFixed(2)}M`;
+    if (value >= 1_000)         return `$${(value / 1_000).toFixed(2)}K`;
+    if (value >= 0.01)          return `$${value.toFixed(2)}`;
+    if (value >= 0.000001)      return `$${value.toFixed(6)}`;
+    return `$${value.toExponential(2)}`;
   }
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(value);
+
+  // Full precision for token prices
+  if (value >= 1)         return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (value >= 0.01)      return `$${value.toFixed(4)}`;
+  if (value >= 0.0001)    return `$${value.toFixed(6)}`;
+  if (value >= 0.0000001) return `$${value.toFixed(9)}`;
+
+  // Very small values — use scientific notation style
+  // e.g. $0.000029 shows as $0.000029
+  const str = value.toPrecision(4);
+  return `$${parseFloat(str)}`;
 }
 
 /**
