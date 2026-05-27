@@ -2,12 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Users, BarChart3, Droplets, TrendingUp } from "lucide-react";
-import { TradePanel } from "@/components/token/TradePanel";
+import { ArrowLeft, ExternalLink, Users, Rocket, Zap } from "lucide-react";
 import { PriceChart } from "@/components/token/PriceChart";
 import { TradeHistory } from "@/components/token/TradeHistory";
-import { AddLiquidityButton } from "@/components/token/AddLiquidityButton";
 import { TokenStatsPanel } from "@/components/token/TokenStatsPanel";
+import { TokenRightPanel } from "@/components/token/TokenRightPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getTokenByMint } from "@/services/db/tokenDbService";
@@ -46,14 +45,14 @@ export default async function TokenDetailPage({ params }: PageProps) {
   ]);
   if (!token) notFound();
 
-  const stats = token.stats;
+  const stats       = token.stats;
+  const isLaunching = token.status === "launching";
+  const isLive      = !isLaunching;
 
   return (
     <div className="mx-auto max-w-screen-xl px-4 py-8 lg:px-6">
-      <Link
-        href="/tokens"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors mb-6"
-      >
+      <Link href="/tokens"
+        className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors mb-6">
         <ArrowLeft className="h-4 w-4" />
         Marketplace
       </Link>
@@ -85,6 +84,21 @@ export default async function TokenDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-extrabold text-[var(--text-primary)]">{token.name}</h1>
                 <Badge variant="surface">${token.symbol}</Badge>
+
+                {/* Status badge */}
+                {isLaunching && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
+                    <Rocket className="h-3 w-3" /> LAUNCHING
+                  </span>
+                )}
+                {isLive && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.25)" }}>
+                    <Zap className="h-3 w-3" /> LIVE
+                  </span>
+                )}
+
                 {stats && stats.priceChange24h > 0 && <Badge variant="new" dot>Hot</Badge>}
               </div>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -127,6 +141,29 @@ export default async function TokenDetailPage({ params }: PageProps) {
             </div>
           </div>
 
+          {/* Barra de progresso bonding */}
+          {isLaunching && (
+            <div className="rounded-xl border p-4 space-y-2"
+              style={{ borderColor: "rgba(251,191,36,0.2)", background: "rgba(251,191,36,0.04)" }}>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: "#9ca3af" }}>Progresso até graduação Raydium</span>
+                <span style={{ color: "#fbbf24", fontWeight: 700 }}>
+                  {token.escrowSol.toFixed(3)} / {token.graduationThresholdSol} SOL
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min((token.escrowSol / token.graduationThresholdSol) * 100, 100)}%`,
+                    background: "linear-gradient(90deg, #fbbf24, #f59e0b)",
+                  }} />
+              </div>
+              <p className="text-xs" style={{ color: "#6b7280" }}>
+                Quando atingir {token.graduationThresholdSol} SOL, a pool Raydium é criada e o token fica negociável publicamente.
+              </p>
+            </div>
+          )}
+
           {/* ✅ Stats em tempo real via DexScreener */}
           <TokenStatsPanel
             mintAddress={mint}
@@ -141,8 +178,8 @@ export default async function TokenDetailPage({ params }: PageProps) {
             } : null}
           />
 
-          {/* Price chart */}
-          <PriceChart mintAddress={mint} symbol={token.symbol} />
+          {/* Price chart — só LIVE */}
+          {isLive && <PriceChart mintAddress={mint} symbol={token.symbol} />}
 
           {/* Description */}
           {token.description && (
@@ -154,15 +191,16 @@ export default async function TokenDetailPage({ params }: PageProps) {
             </Card>
           )}
 
-          {/* Token info table */}
+          {/* Token info */}
           <Card>
             <CardHeader><CardTitle>Informações</CardTitle></CardHeader>
             <div className="divide-y divide-[var(--border)]">
               {[
-                { label: "Mint Address",  value: mint,                          mono: true },
-                { label: "Decimais",      value: String(token.decimals) },
-                { label: "Supply Total",  value: formatCompact(token.supply) },
-                { label: "Criador",       value: shortenAddress(token.creator, 6), mono: true },
+                { label: "Mint Address", value: mint,                             mono: true },
+                { label: "Decimais",     value: String(token.decimals) },
+                { label: "Supply Total", value: formatCompact(token.supply) },
+                { label: "Criador",      value: shortenAddress(token.creator, 6), mono: true },
+                { label: "Status",       value: token.status.toUpperCase() },
               ].map(({ label, value, mono }) => (
                 <div key={label} className="flex items-center justify-between px-5 py-3 text-sm">
                   <span className="text-[var(--text-muted)]">{label}</span>
@@ -174,21 +212,22 @@ export default async function TokenDetailPage({ params }: PageProps) {
             </div>
           </Card>
 
-          {/* Trade history */}
-          <TradeHistory mintAddress={mint} />
+          {/* Trade history — só LIVE */}
+          {isLive && <TradeHistory mintAddress={mint} />}
         </div>
 
         {/* ── Right column (1/3) ── */}
         <div className="space-y-4">
-          <TradePanel
-            mintAddress={mint}
-            tokenSymbol={token.symbol}
-            poolId={pool?.raydiumPoolId ?? null}
-          />
 
-          <AddLiquidityButton
+          {/* Painel inteligente — detecta criador vs outros */}
+          <TokenRightPanel
             mintAddress={mint}
             tokenSymbol={token.symbol}
+            creatorWallet={token.creator}
+            status={token.status}
+            escrowSol={token.escrowSol}
+            graduationThreshold={token.graduationThresholdSol}
+            poolId={pool?.raydiumPoolId ?? null}
             solReserve={pool?.solReserve ?? 0}
             tokenReserve={pool?.tokenReserve ?? 0}
           />
@@ -196,8 +235,8 @@ export default async function TokenDetailPage({ params }: PageProps) {
           <Card>
             <CardBody className="flex flex-col gap-2">
               {[
-                { label: "Ver no Solscan",  href: `https://solscan.io/token/${mint}` },
-                { label: "Ver no Explorer", href: `https://explorer.solana.com/address/${mint}` },
+                { label: "Ver no Solscan",     href: `https://solscan.io/token/${mint}` },
+                { label: "Ver no Explorer",    href: `https://explorer.solana.com/address/${mint}` },
                 { label: "Ver no DexScreener", href: `https://dexscreener.com/solana/${mint}` },
               ].map(({ label, href }) => (
                 <a key={label} href={href} target="_blank" rel="noopener noreferrer"
