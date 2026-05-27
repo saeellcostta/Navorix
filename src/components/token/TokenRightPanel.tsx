@@ -29,46 +29,48 @@ export function TokenRightPanel({
   tokenReserve,
 }: Props) {
   const { publicKey } = useWallet();
-  const isCreator   = publicKey?.toBase58() === creatorWallet;
+  const isCreator   = !!publicKey && publicKey.toBase58() === creatorWallet;
   const isLaunching = status === "launching";
 
-  // Token em LIVE → TradePanel para todos + AddLiquidityButton só para o criador
-  if (!isLaunching) {
-    return (
-      <>
-        <TradePanel
-          mintAddress={mintAddress}
-          tokenSymbol={tokenSymbol}
-          poolId={poolId}
-        />
-        {isCreator && (
-          <AddLiquidityButton
-            mintAddress={mintAddress}
-            tokenSymbol={tokenSymbol}
-            solReserve={solReserve}
-            tokenReserve={tokenReserve}
-          />
-        )}
-      </>
+  if (isLaunching) {
+    // Token em LAUNCHING:
+    // Criador → AddLiquidityButton para criar a pool e graduar
+    // Outros  → BondingBuyPanel para compra antecipada
+    return isCreator ? (
+      <AddLiquidityButton
+        mintAddress={mintAddress}
+        tokenSymbol={tokenSymbol}
+        solReserve={solReserve}
+        tokenReserve={tokenReserve}
+      />
+    ) : (
+      <BondingBuyPanel
+        mintAddress={mintAddress}
+        tokenSymbol={tokenSymbol}
+        escrowSol={escrowSol}
+        graduationThreshold={graduationThreshold}
+      />
     );
   }
 
-  // Token em LAUNCHING:
-  // Criador → vê AddLiquidityButton para adicionar liquidez e graduar
-  // Outros  → veem BondingBuyPanel para compra antecipada
-  return isCreator ? (
-    <AddLiquidityButton
-      mintAddress={mintAddress}
-      tokenSymbol={tokenSymbol}
-      solReserve={solReserve}
-      tokenReserve={tokenReserve}
-    />
-  ) : (
-    <BondingBuyPanel
-      mintAddress={mintAddress}
-      tokenSymbol={tokenSymbol}
-      escrowSol={escrowSol}
-      graduationThreshold={graduationThreshold}
-    />
+  // Token LIVE:
+  // Todos veem TradePanel
+  // Só o criador vê AddLiquidityButton
+  return (
+    <>
+      <TradePanel
+        mintAddress={mintAddress}
+        tokenSymbol={tokenSymbol}
+        poolId={poolId}
+      />
+      {isCreator && (
+        <AddLiquidityButton
+          mintAddress={mintAddress}
+          tokenSymbol={tokenSymbol}
+          solReserve={solReserve}
+          tokenReserve={tokenReserve}
+        />
+      )}
+    </>
   );
 }
